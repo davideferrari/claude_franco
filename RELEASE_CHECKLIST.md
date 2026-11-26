@@ -43,6 +43,30 @@ ancora da eseguire, non funzionalità già disponibili.
 - P1 n. 7: aggiunto `franco_ctl.py stop` (endpoint `/shutdown` autenticato).
 - P1 n. 9: `/franco:franco on` attiva la regola `<spoken>` anche nella sessione
   corrente.
+- Seconda tornata (stesso giorno):
+  - P0 n. 4 completato: i tag che iniziano dentro codice sono ignorati; i
+    riassunti con codice, tabelle, markup o troppo lunghi non vengono letti.
+  - P1 n. 5 completato: coda limitata con scarto atomico, nessuna riproduzione
+    dopo `/silence`, file temporanei sempre rimossi, timeout di rete, salute
+    di sintesi e riproduzione che si ripristina.
+  - P1 n. 6 completato: ogni turno viene letto al massimo una volta.
+  - P1 n. 7 completato: istanza singola con lock, stato atomico e validato,
+    input HTTP validato. Trovato e corretto un reset di connessione su Windows
+    quando il server rispondeva senza leggere il corpo. Il token sta in
+    `%USERPROFILE%`, accessibile solo all'utente, a SYSTEM e agli amministratori.
+  - Un demone avviato da una versione precedente del plugin viene sostituito
+    automaticamente (impronta del codice in `/health`).
+  - Voci: `it-IT-GiuseppeNeural` e `de-DE-KatjaNeural` non esistono più nel
+    catalogo; lista curata rifatta con voce femminile e maschile per lingua.
+  - Test: 133 controlli (unitari, demone simulato, integrazione hook), stabili su
+    10 esecuzioni con Python 3.10 e 3.14; workflow GitHub Actions aggiunto.
+  - Checkout pulito in un percorso con spazi: test, validazione, installazione da
+    marketplace locale e sessione reale riusciti.
+  - "Senza rete" verificato con errori di rete simulati, non scollegando la rete.
+  - P1 n. 8: scelto il funzionamento globale per l'alpha (documentato); la voce
+    sull'isolamento è quindi non applicabile.
+- Restano aperti: annotazione durante un task reale lungo (serve una sessione
+  interattiva), installazione da GitHub dopo il push, demo, punti P2.
 - Percorso audio completo osservato (log del demone: `spoke … : ok`); in
   modalità `claude -p` l'audio viene interrotto da SessionEnd, limite documentato.
 
@@ -89,7 +113,7 @@ ancora da eseguire, non funzionalità già disponibili.
 - [x] Verificare la coesistenza della skill `franco` e del comando `franco`;
   consolidarli o rinominarli se l'esposizione risulta ambigua.
 - [x] Dichiarare la versione minima di Claude Code effettivamente collaudata.
-- [ ] Provare tutto da un checkout pulito, possibilmente con spazi nel percorso.
+- [x] Provare tutto da un checkout pulito, possibilmente con spazi nel percorso.
 
 **Accettazione:** un utente può ottenere la prima risposta parlata seguendo
 soltanto il README, senza modifiche manuali non documentate.
@@ -128,9 +152,9 @@ Problemi verificati:
   possono mai essere inviati a Microsoft.
 - [x] Spiegare che viene inviato il riassunto selezionato e che il suo contenuto
   dipende anche dal modello: non è una garanzia di anonimizzazione.
-- [ ] Escludere dall'estrazione i tag presenti in blocchi di codice e collaudare
+- [x] Escludere dall'estrazione i tag presenti in blocchi di codice e collaudare
   il caso con test di regressione.
-- [ ] Definire una politica conservativa per codice, tabelle e tag malformati:
+- [x] Definire una politica conservativa per codice, tabelle e tag malformati:
   se il contenuto non è adatto alla lettura, preferire di non pronunciarlo.
 - [x] Non presentare il sanitizzatore come un filtro completo di segreti.
 - [x] Documentare servizio esterno, necessità di Internet, endpoint non
@@ -148,16 +172,16 @@ contenuto dei riassunti è dichiarato prima dell'attivazione.
 
 **File:** `hooks/franco_daemon.py`, `hooks/playback.py`, `tests/`.
 
-- [ ] Applicare il limite previsto creando una coda con `maxsize=MAX_QUEUE`.
-- [ ] Rendere sicura la politica di sostituzione dell'elemento più vecchio anche
+- [x] Applicare il limite previsto creando una coda con `maxsize=MAX_QUEUE`.
+- [x] Rendere sicura la politica di sostituzione dell'elemento più vecchio anche
   in presenza di richieste concorrenti, senza bloccare gli handler HTTP.
-- [ ] Eliminare il file temporaneo anche se la sintesi solleva un'eccezione.
-- [ ] Testare l'interruzione durante sintesi, riproduzione e passaggio dalla coda
+- [x] Eliminare il file temporaneo anche se la sintesi solleva un'eccezione.
+- [x] Testare l'interruzione durante sintesi, riproduzione e passaggio dalla coda
   al worker, evitando riproduzioni tardive dopo `/silence`.
-- [ ] Verificare timeout e recupero dopo errori di rete del servizio TTS.
-- [ ] Rendere visibili gli errori di playback: attualmente alcuni fallimenti MCI
+- [x] Verificare timeout e recupero dopo errori di rete del servizio TTS.
+- [x] Rendere visibili gli errori di playback: attualmente alcuni fallimenti MCI
   restituiscono `False`, risultato che il chiamante non segnala.
-- [ ] Aggiornare correttamente lo stato di salute dopo un errore e dopo il
+- [x] Aggiornare correttamente lo stato di salute dopo un errore e dopo il
   successivo recupero.
 
 **Accettazione:** la coda resta limitata, l'audio interrotto non riparte e gli
@@ -172,7 +196,7 @@ errori non lasciano file temporanei né un servizio apparentemente sano ma muto.
 - [x] Verificare il payload `Stop` della versione supportata e valutare l'uso
   del messaggio finale fornito dall'evento, se disponibile.
 - [x] Gestire transcript incompleti, righe malformate e messaggi con soli tool.
-- [ ] Aggiungere una protezione contro la lettura duplicata dello stesso turno.
+- [x] Aggiungere una protezione contro la lettura duplicata dello stesso turno.
 
 **Accettazione:** nessuna risposta precedente viene riletta quando il turno
 corrente non contiene un nuovo riassunto valido.
@@ -184,11 +208,11 @@ corrente non contiene un nuovo riassunto valido.
 
 Questi punti sono rischi da verificare e consolidare, non tutti bug già riprodotti.
 
-- [ ] Proteggere l'avvio simultaneo da più hook o sessioni con un meccanismo
+- [x] Proteggere l'avvio simultaneo da più hook o sessioni con un meccanismo
   single-instance.
-- [ ] Scrivere lo stato in modo atomico e gestire stato obsoleto o malformato.
-- [ ] Verificare le autorizzazioni della cartella e del file contenente il token.
-- [ ] Validare il tipo del JSON e gli header HTTP senza eccezioni non gestite.
+- [x] Scrivere lo stato in modo atomico e gestire stato obsoleto o malformato.
+- [x] Verificare le autorizzazioni della cartella e del file contenente il token.
+- [x] Validare il tipo del JSON e gli header HTTP senza eccezioni non gestite.
 - [x] Propagare gli errori nella CLI: `enable` e `preview` non devono indicare
   successo quando avvio o invio falliscono.
 - [x] Documentare come arrestare il demone e rimuovere la configurazione;
@@ -205,7 +229,7 @@ messaggi della CLI descrivono lo stato effettivo.
 `hooks/session_end.py`, `README.md`, `INTENT.md`.
 
 - [x] Scegliere tra isolamento per progetto/sessione e funzionamento globale.
-- [ ] Se si implementa l'isolamento, evitare che prompt e chiusura di una
+- [x] Se si implementa l'isolamento, evitare che prompt e chiusura di una
   sessione interrompano l'audio di un'altra.
 - [x] Se si mantiene il comportamento globale nell'alpha, documentare
   esplicitamente il limite e rimuovere la promessa di opt-in per progetto.
@@ -238,16 +262,16 @@ reale; ciò che dipende dal comportamento del modello è descritto come tale.
 
 ## Verifiche minime prima della release
 
-- [ ] Aggiungere GitHub Actions su Windows con test Python e validazione del plugin.
-- [ ] Aggiungere test di integrazione degli hook con stdin JSON e ambiente isolato.
-- [ ] Testare il servizio HTTP con TTS e playback simulati: token errato, payload
+- [x] Aggiungere GitHub Actions su Windows con test Python e validazione del plugin.
+- [x] Aggiungere test di integrazione degli hook con stdin JSON e ambiente isolato.
+- [x] Testare il servizio HTTP con TTS e playback simulati: token errato, payload
   non valido, coda piena, silenzio ed errori di sintesi.
-- [ ] Eseguire i test di regressione per i problemi elencati in questo documento.
-- [ ] Eseguire un collaudo manuale con sintesi e audio reali, usando soltanto
+- [x] Eseguire i test di regressione per i problemi elencati in questo documento.
+- [x] Eseguire un collaudo manuale con sintesi e audio reali, usando soltanto
   testo di prova non sensibile.
-- [ ] Verificare lingua italiana e inglese, cambio voce, nome personalizzato,
+- [x] Verificare lingua italiana e inglese, cambio voce, nome personalizzato,
   attivazione/disattivazione e riavvio di Claude Code.
-- [ ] Verificare il comportamento senza rete e con `edge-tts` mancante.
+- [x] Verificare il comportamento senza rete e con `edge-tts` mancante.
 - [ ] Ripetere l'installazione documentata da un checkout pulito.
 
 ## Materiale per GitHub
@@ -257,7 +281,7 @@ reale; ciò che dipende dal comportamento del modello è descritto come tale.
 - [x] Aggiungere al README una sezione troubleshooting e istruzioni di rimozione.
 - [x] Inserire nel manifest URL reali del repository e del supporto, una volta
   deciso dove pubblicare; non lasciare URL segnaposto nella release.
-- [ ] Verificare che i file pubblicati non contengano credenziali, log,
+- [x] Verificare che i file pubblicati non contengano credenziali, log,
   configurazione personale o audio generato.
 - [ ] Preparare una breve demo con testo non sensibile.
 
