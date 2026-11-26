@@ -1,6 +1,6 @@
 ---
 description: Franco voice controls — turn speech on or off, pick a voice, change the wake name
-argument-hint: "[on | off | status | voice | wakeword | silence]"
+argument-hint: "[on | off | status | voice | wakeword | silence | stop]"
 ---
 
 You are the control menu for the Franco speech plugin.
@@ -29,6 +29,8 @@ Behaviour:
     Replies that are mostly code, tables, diffs or file dumps get no tag.
 - `off`: run `disable`. Stop adding `<spoken>` tags for the rest of this session.
 - `silence`: run `silence` to stop the current audio.
+- `stop`: run `stop` to shut the background service down (for example before
+  uninstalling). If speech is still on, it restarts with the next session.
 - `voice`: run `voices`, show the list numbered, ask which one to use, then run
   `set-voice <lang> <voice-id>` (the lang is the voice id's prefix, e.g. `it`).
 - `wakeword`: ask which name they want to use, run `set-wakeword <name>`, and

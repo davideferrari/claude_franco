@@ -1,156 +1,259 @@
 <div align="center">
 
-# 🎙️ Franco
+# Franco
 
-**Dai un nome e una voce a Claude Code.**
+### Una voce per Claude Code
 
-Franco risponde a voce. Voci neurali riassumono a parlato ogni risposta, la
-riproduzione si interrompe nell'istante in cui riprendi la parola, e puoi
-chiamare Claude per nome per aggiungere una nota a metà task senza farlo
-deragliare.
+Franco legge ad alta voce, con voci neurali naturali, un breve riassunto di
+ogni risposta di Claude Code. Interrompe l'audio non appena invii il prompt
+successivo e ti permette di chiamare Claude per nome per aggiungere una nota
+senza fermarne il lavoro.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Versione](https://img.shields.io/badge/versione-0.1.0-blue.svg)]()
-[![Piattaforma](https://img.shields.io/badge/piattaforma-Windows%2010%2F11-0078D6.svg)]()
-[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)]()
-[![Claude Code](https://img.shields.io/badge/per-Claude%20Code-d97757.svg)]()
+[![Licenza: MIT](https://img.shields.io/badge/licenza-MIT-yellow.svg)](LICENSE)
+[![Release](https://img.shields.io/badge/release-0.1.0--alpha.1-orange.svg)](CHANGELOG.md)
+[![Piattaforma](https://img.shields.io/badge/piattaforma-Windows%2010%20%7C%2011-0078D6.svg)](#requisiti)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](#requisiti)
+[![Plugin Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](https://claude.com/claude-code)
 
-*Italiano per prima, multilingua · Voci neurali gratuite · Zero account*
-
-[🇬🇧 English](README.md) · **🇮🇹 Italiano**
+[English](README.md) · **Italiano**
 
 </div>
+
+<!-- Demo: aggiungere qui una breve registrazione dello schermo con audio prima dell'annuncio. -->
 
 ---
 
-> Claude Code ha già la **dettatura vocale** in input (`/voice`), ma nulla
-> risponde a voce. Abbina la tua dettatura (quella integrata, o WhisperFlow) a
-> Franco e ottieni una vera **conversazione a due nel terminale**.
->
-> <!-- TODO: aggiungere una GIF demo qui prima della pubblicazione -->
+## Perché Franco
 
-## ✨ In breve
+Claude Code accetta già l'input vocale, con la dettatura integrata o con
+strumenti come Wispr Flow, ma le sue risposte sono solo testo. Se lavori a
+voce, ti allontani dallo schermo o vuoi semplicemente sentire "fatto" mentre
+guardi altro, devi comunque leggere ogni risposta.
 
-|  | Funzionalità | Cosa significa |
-|---|--------------|----------------|
-| 🔊 | **Riassunti parlati** | Claude chiude le risposte conversazionali con un breve riassunto in prosa, pronunciato da una voce neurale. Codice, tabelle e dump di file **non vengono mai letti** — per design non ricevono il tag. |
-| 🇮🇹 | **Italiano per prima, multilingua** | Voci curate per italiano (`it-IT-ElsaNeural`, `it-IT-GiuseppeNeural`), altre lingue dietro una mappa `lingua → voce`. È Claude stesso a dichiarare la lingua (`<spoken lang="it">`) — nessuna libreria di detection, nessun falso positivo. |
-| ⚡ | **Barge-in** | Inviare un nuovo prompt interrompe l'audio all'istante. Riprendere la parola *è* l'interruzione — nessun hotkey da ricordarsi. |
-| 🙋 | **Nome di richiamo** | Mentre Claude lavora, dici o scrivi `Comunque Franco, <nota>`. Lo riconosce ad alta voce in una riga e prosegue il lavoro. Disponibile anche come `/btw <nota>`. |
-| 🔥 | **Demone caldo** | Un demone localhost autenticato via token sintetizza e riproduce — nessun cold-start Python/TLS a ogni risposta. |
-| 🔓 | **Gratuito e senza account** | Voci neurali Microsoft Edge via `edge-tts`. Nessun abbonamento, nessuna API key, nessun account. |
+Franco chiude il cerchio. Alla fine di ogni risposta conversazionale Claude
+scrive un riassunto di una o due frasi pensato per l'ascolto, e Franco lo
+pronuncia. Codice, tabelle e diff non vengono letti.
 
-## 📦 Installazione
+## Funzionalità
 
-Franco è un plugin per [Claude Code](https://claude.com/claude-code).
+| | |
+|---|---|
+| **Riassunti parlati** | Claude chiude le risposte conversazionali con un breve riassunto in prosa dentro un tag `<spoken>`, che Franco legge ad alta voce. Le risposte composte soprattutto da codice, tabelle o contenuti di file non ricevono il riassunto e restano silenziose. |
+| **Italiano prima di tutto, multilingua** | Voci italiane selezionate (`it-IT-ElsaNeural`, `it-IT-GiuseppeNeural`, `it-IT-IsabellaNeural`), più inglese, spagnolo, francese, tedesco e portoghese. È Claude a dichiarare la lingua di ogni riassunto (`<spoken lang="it">`): nessun rilevamento automatico. |
+| **Interruzione immediata** | Inviare un nuovo prompt ferma subito l'audio in corso. Nessuna scorciatoia da ricordare. |
+| **Nome di richiamo** | Inizia un messaggio con `Comunque Franco, …` per aggiungere una nota: Claude la conferma con una frase parlata e prosegue il lavoro. Il nome è configurabile. `/franco:btw <nota>` fa lo stesso. |
+| **Servizio locale sempre pronto** | Un piccolo processo in background su `127.0.0.1`, protetto da un token rigenerato a ogni avvio, sintetizza e riproduce l'audio senza i ritardi di avvio di Python. |
+| **Gratuito, senza account** | Le voci arrivano dalla sintesi vocale neurale online di Microsoft tramite la libreria open source [`edge-tts`](https://github.com/rany2/edge-tts). Nessuna API key, nessun abbonamento. |
 
-**Da checkout locale:**
+## Requisiti
 
-```jsonc
-// ~/.claude/settings.json
-{
-  "extraKnownMarketplaces": {
-    "franco": {
-      "source": { "source": "directory", "path": "/percorso/assoluto/verso/claude-franco" }
-    }
-  },
-  "enabledPlugins": {
-    "franco@franco": true
-  }
-}
-```
+- **Windows 10 o 11.** La riproduzione usa la Media Control Interface di
+  Windows. macOS e Linux sono nella roadmap.
+- **Claude Code** con supporto ai plugin. Collaudato con la versione 2.1.332.
+- **Python 3.10 o successivo**, da [python.org](https://www.python.org/downloads/windows/)
+  (consigliato: include il launcher `py`) o da qualsiasi altra distribuzione.
+  Collaudato end to end con la 3.14; la suite di test gira anche sulla 3.10.
+- **Una connessione a Internet** mentre la voce è attiva: la sintesi è un
+  servizio online.
+
+## Installazione
+
+**1. Aggiungi il marketplace e installa il plugin**
 
 ```bash
-claude plugin install franco@franco
+claude plugin marketplace add davideferrari/claude_franco
+claude plugin install franco@claude-franco
 ```
 
-**Requisiti**
+Le stesse operazioni sono disponibili in Claude Code con `/plugin`. Per
+provare un checkout locale senza installarlo, avvia Claude Code con
+`claude --plugin-dir <percorso-del-checkout>`.
 
-- Windows 10/11 (la riproduzione usa MCI; macOS/Linux previsto per la v2)
-- Python 3.10+ nel PATH
-- `pip install edge-tts` — TTS neurale gratuito; la sintesi è una chiamata di
-  rete, quindi serve internet
+**2. Installa la libreria vocale nel Python che userà Franco**
 
-## 🚀 Quick start
+```powershell
+py -3 -m pip install "edge-tts>=7.0,<8"
+```
+
+Franco cerca Python in quest'ordine: la variabile d'ambiente `FRANCO_PYTHON`,
+`py -3`, `python3`, `python`. I segnaposto del Microsoft Store ("Alias di
+esecuzione dell'app") vengono riconosciuti e scartati. Se usi un ambiente
+virtuale o un interprete specifico, imposta `FRANCO_PYTHON` sul relativo
+`python.exe`.
+
+**3. Attiva la voce**
+
+In Claude Code:
 
 ```text
-/franco on          # attiva la voce (avvia anche il demone)
-/franco voice       # sfoglia e scegli una voce
-/franco wakeword    # scegli il nome a cui Claude risponde
-/franco off         # silenzia
+/franco:franco on
 ```
 
-Oppure con la CLI:
+Franco verifica la dipendenza, avvia il servizio in background e conferma. Se
+manca qualcosa, indica il comando esatto da eseguire. La voce si attiva
+subito nella sessione corrente e in tutte le sessioni successive.
+
+## Utilizzo
+
+| Comando | Cosa fa |
+|---|---|
+| `/franco:franco` | Mostra lo stato: voce, nome di richiamo, voci, servizio, Python, `edge-tts` |
+| `/franco:franco on` · `off` | Attiva o disattiva la voce |
+| `/franco:franco silence` | Ferma l'audio in corso; la voce resta attiva |
+| `/franco:franco stop` | Arresta il servizio in background; riparte con la sessione successiva se la voce è attiva |
+| `/franco:franco voice` | Elenca le voci disponibili e ne sceglie una per lingua |
+| `/franco:franco wakeword` | Cambia il nome a cui risponde Claude (predefinito: Franco) |
+| `/franco:btw <nota>` | Aggiunge una nota mentre Claude lavora |
+
+Puoi anche chiedere in linguaggio naturale ("silenzio", "usa una voce
+maschile italiana", "chiamati Alfredo"): la skill `franco` inclusa traduce la
+richiesta nell'impostazione giusta.
+
+> Claude Code ha anche un proprio `/btw` integrato per le domande veloci.
+> La variante di Franco si chiama `/franco:btw` e conferma la nota a voce.
+
+Gli stessi controlli sono disponibili da terminale, dalla cartella del plugin:
 
 ```bash
-python hooks/franco_ctl.py enable
-python hooks/franco_ctl.py status
-python hooks/franco_ctl.py set-wakeword "Alfredo"
-python hooks/franco_ctl.py silence
+bash hooks/run.sh franco_ctl.py status
+bash hooks/run.sh franco_ctl.py set-voice it it-IT-GiuseppeNeural
+bash hooks/run.sh franco_ctl.py preview "Ciao, sono Franco."
 ```
 
-## ⚙️ Come funziona
+## Come funziona
 
+```text
+Invii un prompt ──▶ hook UserPromptSubmit ──▶ ferma l'audio in corso
+                                       └──▶ nome di richiamo? ──▶ contesto "nota"
+Claude risponde ──▶ tag <spoken lang="…"> ──▶ hook Stop ──▶ servizio locale
+                                                               ├─ sintesi edge-tts
+                                                               └─ riproduzione Windows
+Avvio sessione ──▶ hook SessionStart ──▶ regola <spoken> + avvio del servizio
 ```
-utente parla/scrive ──▶ hook UserPromptSubmit ──▶ barge-in (il demone tace)
-                                         └─▶ wake word? ──▶ nota a margine "btw"
-Claude risponde ──▶ tag <spoken> ──▶ hook Stop ──▶ demone locale caldo
-                                                        └─▶ edge-tts + playback MCI
-hook SessionStart ──▶ inietta la regola <spoken> (se abilitato) + assicura il demone
+
+1. Con la voce attiva, lo hook **SessionStart** aggiunge al contesto di Claude
+   una breve istruzione: chiudere le risposte conversazionali con un
+   riassunto `<spoken>` in prosa semplice, e ometterlo per le risposte fatte
+   di dati.
+2. Lo hook **Stop** prende la risposta finale del turno, estrae l'ultimo tag
+   `<spoken>` e lo passa al servizio locale.
+3. Il servizio sintetizza il testo con la voce associata alla lingua
+   dichiarata e lo riproduce. La riproduzione è sequenziale e la coda è
+   corta, quindi la voce non resta mai molto indietro.
+4. Lo hook **UserPromptSubmit** ferma l'audio a ogni prompt inviato e
+   riconosce il nome di richiamo.
+
+Con la voce disattivata, gli hook terminano subito senza avviare Python.
+
+## Configurazione
+
+Le impostazioni sono semplici file in `%USERPROFILE%\.franco\`, gestiti dai
+comandi descritti sopra:
+
+| File | Scopo |
+|---|---|
+| `enabled` | Presente quando la voce è attiva |
+| `wakeword` | Il nome di richiamo |
+| `voice_map.json` | Lingua → voce, ad esempio `{"it": "it-IT-ElsaNeural", "default": "en-US-AvaMultilingualNeural"}` |
+| `python` | L'interprete trovato da Franco; eliminalo per ripetere la ricerca |
+| `daemon.state`, `daemon.log` | Porta, token e log del servizio |
+
+| Variabile d'ambiente | Scopo |
+|---|---|
+| `FRANCO_PYTHON` | Percorso completo dell'interprete Python da usare |
+| `FRANCO_HOME` | Cartella alternativa per le impostazioni, utile per i test |
+
+## Privacy e dati
+
+Leggi questa sezione prima di attivare la voce.
+
+- **Cosa esce dal tuo computer:** solo il testo dentro ogni tag `<spoken>`,
+  inviato al servizio vocale di Microsoft (`speech.platform.bing.com`) per la
+  sintesi. Franco non invia i tuoi prompt, i tuoi file né il resto delle
+  risposte.
+- **Il riassunto lo scrive il modello.** Claude è istruito a usare prosa
+  semplice senza codice, comandi o numeri lunghi, ma Franco non può garantire
+  cosa contenga un riassunto. La pulizia del testo rimuove solo la
+  formattazione: **non** è un filtro per segreti o dati personali. Se lavori
+  con materiale riservato, tieni la voce disattivata in quella sessione.
+- **Servizio non ufficiale.** `edge-tts` usa l'endpoint della funzione
+  "Leggi ad alta voce" di Microsoft Edge. È gratuito e non richiede account,
+  ma non è un'API pubblica supportata e può cambiare o smettere di funzionare
+  senza preavviso.
+- **Cosa resta in locale:** impostazioni e un log in `%USERPROFILE%\.franco\`.
+  Il log registra lingua, voce, lunghezza ed esito di ogni frase, mai il
+  testo. I file audio sono temporanei e vengono eliminati dopo la
+  riproduzione.
+- **Servizio locale:** ascolta solo su `127.0.0.1`. Ogni comando richiede un
+  token casuale rigenerato a ogni avvio.
+
+Dettagli e modalità di segnalazione delle vulnerabilità sono in
+[SECURITY.md](SECURITY.md).
+
+## Limiti noti
+
+Franco è una release **alpha**:
+
+- **Solo Windows**, per ora.
+- **Le impostazioni valgono per utente, non per progetto.** Attivazione, voci
+  e nome di richiamo si applicano a tutte le sessioni di Claude Code. Con due
+  sessioni aperte, un prompt inviato in una ferma anche l'audio dell'altra.
+- **Il nome di richiamo viene riconosciuto nel testo inviato**, scritto o
+  dettato. Franco non ascolta il microfono.
+- **L'interruzione avviene all'invio del prompt**, non quando inizi a parlare.
+- **I riassunti dipendono dal modello**, che deve seguire l'istruzione. Se
+  omette il tag, la risposta semplicemente non viene letta.
+- **Le esecuzioni non interattive (`claude -p`) non vengono lette:** la
+  sessione termina, e il suo audio viene fermato, subito dopo la risposta.
+
+## Risoluzione dei problemi
+
+| Sintomo | Cosa fare |
+|---|---|
+| "no working Python 3.10+ found" all'avvio della sessione | Installa Python da python.org, oppure imposta `FRANCO_PYTHON` sul `python.exe` del tuo interprete. |
+| "edge-tts is not installed for …" | Esegui il comando indicato nel messaggio: installa la libreria nell'interprete usato da Franco. |
+| Non viene letto nulla | Esegui `/franco:franco` e verifica che la voce sia attiva e il servizio in esecuzione, poi consulta `%USERPROFILE%\.franco\daemon.log`. Vengono lette solo le risposte che contengono un riassunto. |
+| Python sbagliato dopo averne installato uno nuovo | Elimina `%USERPROFILE%\.franco\python`, oppure imposta `FRANCO_PYTHON`. |
+
+## Disinstallazione
+
+In Claude Code esegui `/franco:franco off` e poi `/franco:franco stop`.
+Quindi, da terminale:
+
+```bash
+claude plugin uninstall franco@claude-franco
+claude plugin marketplace remove claude-franco
 ```
 
-1. Un **hook SessionStart** inietta la regola di emissione `<spoken>` (solo
-   dove la voce è abilitata) e si assicura che il demone sia attivo.
-2. Claude chiude le risposte conversazionali con
-   `<spoken lang="xx">…</spoken>` (prosa semplice, 1–2 frasi, niente markdown).
-3. L'**hook Stop** estrae il tag dalla trascrizione e lo invia via POST al
-   demone, che lo sintetizza con la voce mappata alla lingua e lo riproduce
-   (MCI su Windows).
-4. L'**hook UserPromptSubmit** realizza la sensazione di conversazione:
-   barge-in a ogni nuovo prompt, e il rilevamento del nome di richiamo
-   trasforma `Comunque Franco, …` in una nota a margine a metà task (stesso
-   comportamento di `/btw`).
+Infine elimina `%USERPROFILE%\.franco\` per rimuovere impostazioni e log, e se
+vuoi esegui `py -3 -m pip uninstall edge-tts`.
 
-La voce è **spenta di default** e opt-in. Le risposte ricche di dati (codice,
-tabelle, dump) restano silenziose per design — se il modello "dimentica" il
-tag, la risposta semplicemente non viene letta: degradazione silenziosa, mai
-rumorosa.
+## Roadmap
 
-## 🔒 Privacy e sicurezza
+- Riproduzione su macOS e Linux (la sintesi è già multipiattaforma)
+- Sintesi in streaming, frase per frase
+- Voci offline (Windows SAPI, Piper) come alternativa al servizio online
+- Impostazioni per progetto
+- `/speak-full` per leggere un'intera risposta
 
-- Il tuo **codice, le tabelle e i dump di file non vengono mai inviati
-  da nessuna parte**: non ricevono mai un tag `<spoken>`. Dalla tua macchina
-  esce solo il breve riassunto in prosa.
-- Il riassunto viene sintetizzato dal backend `edge-tts` di Microsoft (il
-  servizio non documentato dietro Read Aloud di Edge — gratuito, senza
-  account, ma non un'API supportata; può cambiare senza preavviso). I fallback
-  sono documentati in [`INTENT.md`](INTENT.md).
-- Il demone ascolta solo su `127.0.0.1` ed è autenticato via token.
+## Contribuire
 
-## 🗺️ Roadmap
+Issue e pull request sono benvenute, anche per aggiungere voci alla mappa
+delle lingue. Segnala i problemi di sicurezza in privato, come descritto in
+[SECURITY.md](SECURITY.md). Prima di aprire una pull request esegui i
+controlli:
 
-Consegnato in **v0.1.0** — l'intero loop vocale end-to-end.
+```bash
+py -3 tests/test_franco.py
+claude plugin validate .
+```
 
-Previsto per la **v2**:
+## Ringraziamenti
 
-- [ ] Riproduzione su macOS/Linux (la sintesi è già cross-platform)
-- [ ] Sintesi in streaming, frase per frase
-- [ ] Fallback offline (SAPI / Piper)
-- [ ] `/speak-full` — leggere l'intera risposta ad alta voce
+Sintesi vocale a cura di [`edge-tts`](https://github.com/rany2/edge-tts).
+Franco è un progetto indipendente, non affiliato né approvato da Anthropic o
+Microsoft.
 
-## 🤝 Contributi
+## Licenza
 
-Aperto a chiunque — issue, PR e nuove voci per la mappa `lingua → voce` sono
-benvenute. Manteniamolo amichevole.
-
-## 📄 Licenza
-
-Rilasciato sotto [Licenza MIT](LICENSE) — **libero di usare, modificare e
-condividere, per chiunque**. Vale per te, il tuo team, il tuo progetto
-parallelo e la tua azienda.
-
-<div align="center">
-
-*Costruito per chi parla al terminale.*
-
-</div>
+[MIT](LICENSE) © 2026 Davide Ferrari

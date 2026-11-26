@@ -10,6 +10,8 @@ Usage:
   python franco_ctl.py set-voice <lang> <id>  map a language to an edge-tts voice
   python franco_ctl.py voices [lang]          list curated voices (filter by lang)
   python franco_ctl.py silence                stop the current audio now
+  python franco_ctl.py stop                   stop the background daemon (it restarts
+                                              with the next session if speech is on)
   python franco_ctl.py preview <text>         synthesise and play a test line
 
 Settings persist as plain files in ~/.franco/ — nothing to edit by hand.
@@ -129,6 +131,15 @@ def main(argv):
     if cmd == "silence":
         fc.post_to_daemon("/silence", {}, timeout=1.0)
         print("silenced")
+        return 0
+    if cmd == "stop":
+        if fc.daemon_health() is None:
+            print("daemon is not running")
+            return 0
+        if not fc.post_to_daemon("/shutdown", {}, timeout=2.0):
+            print("could not reach the daemon")
+            return 1
+        print("daemon stopped")
         return 0
     if cmd == "preview":
         if not rest:

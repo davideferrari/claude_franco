@@ -23,6 +23,29 @@ ancora da eseguire, non funzionalità già disponibili.
 - Configurazione e demone sono condivisi in `~/.franco/`: non c'è isolamento
   esplicito per progetto o sessione.
 
+## Avanzamento (26 novembre 2026, branch `release/v0.1.0-alpha.1`)
+
+- P0 n. 1 completato: `claude plugin validate .` passa; gli hook sono stati
+  osservati in sessioni reali con Claude Code 2.1.332 (`--plugin-dir`); con il
+  riferimento esplicito nel manifest lo hook veniva comunque eseguito una sola
+  volta, ma i percorsi standard sono stati rimossi dal manifest per chiarezza.
+- P0 n. 2 quasi completato: `marketplace.json` aggiunto e installazione da
+  marketplace locale verificata in una configurazione isolata; comandi esposti
+  come `/franco:franco` e `/franco:btw` (il comando prevale sulla skill omonima).
+  Resta la prova da checkout pulito con spazi nel percorso e quella da GitHub
+  dopo il push.
+- P0 n. 3 completato: nuovo launcher `hooks/run.sh`; scoperto e corretto anche
+  un bug di encoding (stdin degli hook decodificato in cp1252).
+- P0 n. 4: documentazione allineata (README, `SECURITY.md`); restano le
+  modifiche al codice di estrazione e la politica sui tag malformati.
+- P1 n. 6: lo Stop hook usa `last_assistant_message`; in sessione reale il testo
+  finale arrivava nel transcript dopo l'esecuzione dello hook.
+- P1 n. 7: aggiunto `franco_ctl.py stop` (endpoint `/shutdown` autenticato).
+- P1 n. 9: `/franco:franco on` attiva la regola `<spoken>` anche nella sessione
+  corrente.
+- Percorso audio completo osservato (log del demone: `spoke … : ok`); in
+  modalità `claude -p` l'audio viene interrotto da SessionEnd, limite documentato.
+
 ## Priorità
 
 | Livello | Significato |
@@ -37,13 +60,13 @@ ancora da eseguire, non funzionalità già disponibili.
 
 **File:** `hooks/hooks.json`, `.claude-plugin/plugin.json`.
 
-- [ ] Racchiudere gli eventi di `hooks/hooks.json` in una proprietà principale
+- [x] Racchiudere gli eventi di `hooks/hooks.json` in una proprietà principale
   `"hooks"`, come richiesto dal formato dei file hook.
-- [ ] Verificare se mantenere il riferimento esplicito al file nel manifest,
+- [x] Verificare se mantenere il riferimento esplicito al file nel manifest,
   dato che `hooks/hooks.json` è già una posizione standard; evitare che la
   configurazione venga applicata due volte.
-- [ ] Eseguire `claude plugin validate .` e correggere tutti gli errori.
-- [ ] Verificare in una vera sessione che ogni hook venga eseguito una sola volta.
+- [x] Eseguire `claude plugin validate .` e correggere tutti gli errori.
+- [x] Verificare in una vera sessione che ogni hook venga eseguito una sola volta.
 
 **Accettazione:** validazione riuscita; gli eventi `SessionStart`,
 `UserPromptSubmit`, `Stop` e `SessionEnd` funzionano nel plugin caricato.
@@ -53,19 +76,19 @@ ancora da eseguire, non funzionalità già disponibili.
 **File:** `README.md`, `.claude-plugin/`, `commands/franco.md`,
 `skills/franco/SKILL.md`.
 
-- [ ] Scegliere il percorso di distribuzione: marketplace del repository oppure
+- [x] Scegliere il percorso di distribuzione: marketplace del repository oppure
   caricamento locale con `--plugin-dir` per l'anteprima.
-- [ ] Se si mantiene il percorso marketplace descritto nel README, aggiungere
+- [x] Se si mantiene il percorso marketplace descritto nel README, aggiungere
   `.claude-plugin/marketplace.json` con una voce che punti al plugin.
-- [ ] Documentare clonazione, installazione delle dipendenze, registrazione del
+- [x] Documentare clonazione, installazione delle dipendenze, registrazione del
   marketplace e installazione del plugin, nell'ordine corretto.
-- [ ] Sostituire nei contenuti Markdown `$CLAUDE_PLUGIN_ROOT` con
+- [x] Sostituire nei contenuti Markdown `$CLAUDE_PLUGIN_ROOT` con
   `${CLAUDE_PLUGIN_ROOT}`, la forma di sostituzione documentata da Claude Code.
-- [ ] Verificare i nomi effettivamente esposti e documentare i comandi con
+- [x] Verificare i nomi effettivamente esposti e documentare i comandi con
   namespace, ad esempio `/franco:franco on` e `/franco:btw`.
-- [ ] Verificare la coesistenza della skill `franco` e del comando `franco`;
+- [x] Verificare la coesistenza della skill `franco` e del comando `franco`;
   consolidarli o rinominarli se l'esposizione risulta ambigua.
-- [ ] Dichiarare la versione minima di Claude Code effettivamente collaudata.
+- [x] Dichiarare la versione minima di Claude Code effettivamente collaudata.
 - [ ] Provare tutto da un checkout pulito, possibilmente con spazi nel percorso.
 
 **Accettazione:** un utente può ottenere la prima risposta parlata seguendo
@@ -76,13 +99,13 @@ soltanto il README, senza modifiche manuali non documentate.
 **File:** nuovo `requirements.txt` oppure `pyproject.toml`, `README.md`,
 `hooks/franco_common.py`.
 
-- [ ] Dichiarare `edge-tts` con una versione o un intervallo collaudato.
-- [ ] Documentare l'installazione con `python -m pip`, evitando ambiguità tra
+- [x] Dichiarare `edge-tts` con una versione o un intervallo collaudato.
+- [x] Documentare l'installazione con `python -m pip`, evitando ambiguità tra
   `pip` e l'interprete che esegue gli hook.
-- [ ] Verificare che il `pythonw` usato per il demone appartenga allo stesso
+- [x] Verificare che il `pythonw` usato per il demone appartenga allo stesso
   ambiente Python degli hook; non affidarsi soltanto al primo trovato nel PATH.
-- [ ] Segnalare chiaramente dipendenza mancante e avvio del demone fallito.
-- [ ] Collaudare almeno Python 3.10 e una versione recente se si mantiene la
+- [x] Segnalare chiaramente dipendenza mancante e avvio del demone fallito.
+- [x] Collaudare almeno Python 3.10 e una versione recente se si mantiene la
   dichiarazione di supporto a Python 3.10+.
 
 **Accettazione:** la configurazione funziona su Windows con l'interprete
@@ -101,18 +124,18 @@ Problemi verificati:
 - I separatori delle tabelle vengono rimossi, ma i dati restano nel risultato.
 - `extract_spoken()` riconosce un tag anche all'interno di un blocco di codice.
 
-- [ ] Rimuovere le garanzie assolute secondo cui codice e dati sensibili non
+- [x] Rimuovere le garanzie assolute secondo cui codice e dati sensibili non
   possono mai essere inviati a Microsoft.
-- [ ] Spiegare che viene inviato il riassunto selezionato e che il suo contenuto
+- [x] Spiegare che viene inviato il riassunto selezionato e che il suo contenuto
   dipende anche dal modello: non è una garanzia di anonimizzazione.
 - [ ] Escludere dall'estrazione i tag presenti in blocchi di codice e collaudare
   il caso con test di regressione.
 - [ ] Definire una politica conservativa per codice, tabelle e tag malformati:
   se il contenuto non è adatto alla lettura, preferire di non pronunciarlo.
-- [ ] Non presentare il sanitizzatore come un filtro completo di segreti.
-- [ ] Documentare servizio esterno, necessità di Internet, endpoint non
+- [x] Non presentare il sanitizzatore come un filtro completo di segreti.
+- [x] Documentare servizio esterno, necessità di Internet, endpoint non
   ufficialmente supportato, dati locali e modalità di disattivazione.
-- [ ] Distinguere le alternative offline pianificate da quelle già implementate;
+- [x] Distinguere le alternative offline pianificate da quelle già implementate;
   correggere il riferimento ai fallback documentati se non sono ancora descritti.
 
 **Accettazione:** documentazione e comportamento coincidono; gli esempi di codice
@@ -144,11 +167,11 @@ errori non lasciano file temporanei né un servizio apparentemente sano ma muto.
 
 **File:** `hooks/stop_hook.py`, `tests/`.
 
-- [ ] Evitare che la ricerca dell'ultimo testo assistant risalga a una risposta
+- [x] Evitare che la ricerca dell'ultimo testo assistant risalga a una risposta
   precedente all'ultimo messaggio utente.
-- [ ] Verificare il payload `Stop` della versione supportata e valutare l'uso
+- [x] Verificare il payload `Stop` della versione supportata e valutare l'uso
   del messaggio finale fornito dall'evento, se disponibile.
-- [ ] Gestire transcript incompleti, righe malformate e messaggi con soli tool.
+- [x] Gestire transcript incompleti, righe malformate e messaggi con soli tool.
 - [ ] Aggiungere una protezione contro la lettura duplicata dello stesso turno.
 
 **Accettazione:** nessuna risposta precedente viene riletta quando il turno
@@ -166,9 +189,9 @@ Questi punti sono rischi da verificare e consolidare, non tutti bug già riprodo
 - [ ] Scrivere lo stato in modo atomico e gestire stato obsoleto o malformato.
 - [ ] Verificare le autorizzazioni della cartella e del file contenente il token.
 - [ ] Validare il tipo del JSON e gli header HTTP senza eccezioni non gestite.
-- [ ] Propagare gli errori nella CLI: `enable` e `preview` non devono indicare
+- [x] Propagare gli errori nella CLI: `enable` e `preview` non devono indicare
   successo quando avvio o invio falliscono.
-- [ ] Documentare come arrestare il demone e rimuovere la configurazione;
+- [x] Documentare come arrestare il demone e rimuovere la configurazione;
   chiarire che `disable` silenzia ma non termina il processo.
 
 **Accettazione:** avvii concorrenti non producono demoni incontrollati; status e
@@ -181,12 +204,12 @@ messaggi della CLI descrivono lo stato effettivo.
 **File:** `hooks/franco_common.py`, `hooks/prompt_hook.py`,
 `hooks/session_end.py`, `README.md`, `INTENT.md`.
 
-- [ ] Scegliere tra isolamento per progetto/sessione e funzionamento globale.
+- [x] Scegliere tra isolamento per progetto/sessione e funzionamento globale.
 - [ ] Se si implementa l'isolamento, evitare che prompt e chiusura di una
   sessione interrompano l'audio di un'altra.
-- [ ] Se si mantiene il comportamento globale nell'alpha, documentare
+- [x] Se si mantiene il comportamento globale nell'alpha, documentare
   esplicitamente il limite e rimuovere la promessa di opt-in per progetto.
-- [ ] Preservare `FRANCO_HOME` come override utile per test isolati.
+- [x] Preservare `FRANCO_HOME` come override utile per test isolati.
 
 **Accettazione:** il comportamento con due sessioni aperte è collaudato e
 corrisponde alla documentazione, oppure è dichiarato non supportato nell'alpha.
@@ -196,15 +219,15 @@ corrisponde alla documentazione, oppure è dichiarato non supportato nell'alpha.
 **File:** `hooks/session_start.py`, `hooks/prompt_hook.py`,
 `commands/franco.md`, `commands/btw.md`, `skills/franco/SKILL.md`, `README.md`.
 
-- [ ] Verificare che l'attivazione a sessione già iniziata fornisca anche la
+- [x] Verificare che l'attivazione a sessione già iniziata fornisca anche la
   regola per generare i riassunti, non soltanto l'avvio del demone.
-- [ ] Se serve una nuova sessione, dichiararlo coerentemente in comando, skill
+- [x] Se serve una nuova sessione, dichiararlo coerentemente in comando, skill
   e README; l'avvio del demone da solo non inietta la regola nel contesto.
-- [ ] Spiegare che il wake name viene riconosciuto nel testo inviato, non da un
+- [x] Spiegare che il wake name viene riconosciuto nel testo inviato, non da un
   microfono ascoltato direttamente dal plugin.
-- [ ] Descrivere il barge-in come interruzione all'invio del prompt, non al primo
+- [x] Descrivere il barge-in come interruzione all'invio del prompt, non al primo
   suono pronunciato dall'utente.
-- [ ] Distinguere il comando del plugin dal `/btw` nativo di Claude Code.
+- [x] Distinguere il comando del plugin dal `/btw` nativo di Claude Code.
 - [ ] Collaudare un'annotazione durante un task reale: una semplice istruzione
   aggiunta al prompt non dimostra l'esistenza di un canale indipendente.
 - [ ] Se la gestione davvero indipendente non è disponibile, ridimensionare la
@@ -229,10 +252,10 @@ reale; ciò che dipende dal comportamento del modello è descritto come tale.
 
 ## Materiale per GitHub
 
-- [ ] Aggiungere `SECURITY.md` con privacy e istruzioni per segnalare vulnerabilità.
-- [ ] Aggiungere `CHANGELOG.md` e note della prima alpha con limiti noti.
-- [ ] Aggiungere al README una sezione troubleshooting e istruzioni di rimozione.
-- [ ] Inserire nel manifest URL reali del repository e del supporto, una volta
+- [x] Aggiungere `SECURITY.md` con privacy e istruzioni per segnalare vulnerabilità.
+- [x] Aggiungere `CHANGELOG.md` e note della prima alpha con limiti noti.
+- [x] Aggiungere al README una sezione troubleshooting e istruzioni di rimozione.
+- [x] Inserire nel manifest URL reali del repository e del supporto, una volta
   deciso dove pubblicare; non lasciare URL segnaposto nella release.
 - [ ] Verificare che i file pubblicati non contengano credenziali, log,
   configurazione personale o audio generato.

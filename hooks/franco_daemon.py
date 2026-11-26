@@ -4,6 +4,7 @@ Endpoints (all require the X-Franco-Token header, except /health):
   GET  /say?...   not used — say is POST-only
   POST /say       {"text": str, "lang": str}  -> queued for synthesis+playback
   POST /silence   stop current playback and clear the queue
+  POST /shutdown  silence, then exit (used by `franco_ctl.py stop`)
   GET  /health    {"ok": true, "synth": bool, "queue": int}
 
 State is written to ~/.franco/daemon.state: {"port": ..., "token": ...}.
@@ -183,7 +184,7 @@ class _Handler(BaseHTTPRequestHandler):
                 "synth": self.player.synth_ok,
                 "queue": self.player.queue.qsize(),
             })
-        elif self.path in ("/say", "/silence"):
+        elif self.path in ("/say", "/silence", "/shutdown"):
             self._send(405, {"error": "POST required"})
         else:
             self._send(404, {"error": "not found"})
@@ -210,6 +211,11 @@ class _Handler(BaseHTTPRequestHandler):
         elif self.path == "/silence":
             self.player.silence()
             self._send(200, {"ok": True})
+        elif self.path == "/shutdown":
+            self.player.silence()
+            self._send(200, {"ok": True})
+            # shutdown() blocks until serve_forever() returns: call it off-thread.
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
         else:
             self._send(404, {"error": "not found"})
 
@@ -246,6 +252,12 @@ def main():
         pass
 
     server.serve_forever()
+    server.server_close()
+    try:
+        os.unlink(fc.config_path("daemon.state"))
+    except OSError:
+        pass
+    _Player._log("daemon stopped (pid %d)" % os.getpid())
 
 
 if __name__ == "__main__":

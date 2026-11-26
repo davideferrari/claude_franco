@@ -7,7 +7,7 @@
 ## Perché esiste
 
 Claude Code ha dettatura vocale in input (`/voice`, push-to-talk) ma **nessun output vocale**.
-Chi lavora a voce — con WhisperFlow o con la dettatura integrata — deve comunque leggere le
+Chi lavora a voce — con Wispr Flow o con la dettatura integrata — deve comunque leggere le
 risposte sullo schermo. Esistono due progetti community (give-claude-code-voice-tts,
 claude-speak), ciascuno con metà della soluzione: il primo ha voci neurali ma è Windows-only e
 anglocentrico; il secondo è multipiattaforma ma usa motori robotici del sistema operativo.
@@ -46,8 +46,8 @@ SessionStart hook ──▶ inietta regola <spoken> (se abilitato) + assicura de
 
 - **Demone** HTTP su localhost, token-authenticated, demone caldo (no cold-start Python/TLS per
   ogni risposta), coda di riproduzione serializzata.
-- **Config** in `~/.franco/` (enabled, mappa voci, wake word). **Off by default**, opt-in per
-  progetto.
+- **Config** in `~/.franco/` (enabled, mappa voci, wake word). **Off by default**, opt-in.
+  Nell'alpha le impostazioni valgono per utente; quelle per progetto sono in roadmap.
 - **Engine**: edge-tts (voci neurali Microsoft, gratuite, no account). Playback Windows via
   MCI/winmm.dll; il modulo playback è isolato per estendere macOS/Linux in v2.
 
@@ -61,8 +61,9 @@ SessionStart hook ──▶ inietta regola <spoken> (se abilitato) + assicura de
 ## Vincoli accettati
 
 - edge-tts parla con un endpoint non documentato di Microsoft: può cambiare senza preavviso.
-  Il testo del riassunto viaggia verso i server Microsoft (mai codice/tabelle). Da documentare
-  in SECURITY.md con i fallback pre-decisi.
+  Il testo del riassunto viaggia verso i server Microsoft; il suo contenuto dipende dal modello,
+  quindi non è una garanzia di anonimizzazione. Documentato in SECURITY.md; i fallback offline
+  (SAPI/Piper) sono pianificati per la v2.
 - Il tag `<spoken>` dipende dall'istruzione iniettata a SessionStart: se il modello "dimentica",
   la risposta semplicemente non viene letta (degradazione silenziosa, mai rumorosa).
 
@@ -70,4 +71,4 @@ SessionStart hook ──▶ inietta regola <spoken> (se abilitato) + assicura de
 
 Sviluppatori che lavorano a voce (dettatura/WhisperFlow), utenti con esigenze di accessibilità
 o affaticamento visivo, chiunque voglia sentire "task completato" da dietro lo schermo.
-Repo pubblico su GitHub, licenza MIT, README in inglese.
+Repo pubblico su GitHub, licenza MIT, README in inglese e in italiano.

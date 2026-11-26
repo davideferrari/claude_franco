@@ -1,151 +1,252 @@
 <div align="center">
 
-# 🎙️ Franco
+# Franco
 
-**Give Claude Code a name and a voice.**
+### A voice for Claude Code
 
-Franco speaks back. Neural voices summarise each response aloud, playback
-cuts the instant you take the floor, and you can call Claude by its name to
-drop a mid-task note without breaking its flow.
+Franco reads a short summary of each Claude Code reply aloud with natural
+neural voices, stops the audio as soon as you send your next prompt, and lets
+you address Claude by name to add a note without interrupting its work.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)]()
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6.svg)]()
-[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)]()
-[![Claude Code](https://img.shields.io/badge/for-Claude%20Code-d97757.svg)]()
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+[![Release](https://img.shields.io/badge/release-0.1.0--alpha.1-orange.svg)](CHANGELOG.md)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6.svg)](#requirements)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](#requirements)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](https://claude.com/claude-code)
 
-*Italian-first, multilingual · Free neural voices · Zero accounts*
-
-**🇬🇧 English** · [🇮🇹 Italiano](README.it.md)
+**English** · [Italiano](README.it.md)
 
 </div>
+
+<!-- Demo: add a short screen recording with audio here before the announcement. -->
 
 ---
 
-> Claude Code already has voice **dictation** on the input side (`/voice`),
-> but nothing speaks back. Pair your dictation (Claude Code's own, or
-> WhisperFlow) with Franco and you get a genuine **two-way conversation in
-> the terminal**.
->
-> <!-- TODO: add a demo GIF here before publishing -->
+## Why Franco
 
-## ✨ Highlights
+Claude Code already accepts voice input, through its built-in dictation or
+tools such as Wispr Flow, but its answers are text only. If you work by voice,
+step away from the screen, or simply want to hear "done" while you look at
+something else, you still have to read every reply.
 
-|  | Feature | What it means |
-|---|---------|---------------|
-| 🔊 | **Spoken summaries** | Claude ends conversational replies with a short prose summary, spoken by a neural voice. Code, tables and file dumps **never** get read — they don't get a tag, by design. |
-| 🇮🇹 | **Italian-first, multilingual** | Curated Italian voices (`it-IT-ElsaNeural`, `it-IT-GiuseppeNeural`), more languages behind a `lang → voice` map. Claude itself declares the language (`<spoken lang="it">`) — no detection library, no misfires. |
-| ⚡ | **Barge-in** | Submitting a new prompt stops the current audio instantly. Taking the floor *is* the interruption — no hotkey to remember. |
-| 🙋 | **Wake name** | While Claude works, say or type `Comunque Franco, <note>`. It acknowledges aloud in one line and keeps working. Also available as `/btw <note>`. |
-| 🔥 | **Warm daemon** | A token-authenticated localhost daemon synthesises and plays — no Python/TLS cold start on every reply. |
-| 🔓 | **Free & account-less** | Microsoft Edge neural voices via `edge-tts`. No subscription, no API key, no account. |
+Franco closes that loop. At the end of each conversational reply Claude writes
+a one- or two-sentence summary meant for a listener, and Franco speaks it.
+Code, tables and diffs are not read aloud.
 
-## 📦 Install
+## Features
 
-Franco is a [Claude Code](https://claude.com/claude-code) plugin.
+| | |
+|---|---|
+| **Spoken summaries** | Claude ends conversational replies with a short plain-prose summary in a `<spoken>` tag, which Franco reads aloud. Replies that are mostly code, tables or file dumps get no summary and stay silent. |
+| **Italian first, multilingual** | Curated Italian voices (`it-IT-ElsaNeural`, `it-IT-GiuseppeNeural`, `it-IT-IsabellaNeural`) plus English, Spanish, French, German and Portuguese. Claude declares the language of each summary (`<spoken lang="it">`), so no language detection is involved. |
+| **Barge-in** | Sending a new prompt stops the current audio immediately. No hotkey to remember. |
+| **Wake name** | Start a message with `Comunque Franco, …` (or `By the way Franco, …`) to add a note: Claude acknowledges it in one spoken line and keeps working. The name is configurable. `/franco:btw <note>` does the same. |
+| **Warm local service** | A small background process on `127.0.0.1`, protected by a per-run token, synthesises and plays the audio so replies are not delayed by Python start-up. |
+| **Free, no account** | Voices come from Microsoft's online neural text-to-speech through the open-source [`edge-tts`](https://github.com/rany2/edge-tts) library. No API key or subscription. |
 
-**From a local checkout:**
+## Requirements
 
-```jsonc
-// ~/.claude/settings.json
-{
-  "extraKnownMarketplaces": {
-    "franco": {
-      "source": { "source": "directory", "path": "/absolute/path/to/claude-franco" }
-    }
-  },
-  "enabledPlugins": {
-    "franco@franco": true
-  }
-}
-```
+- **Windows 10 or 11.** Audio playback uses the Windows Media Control
+  Interface. macOS and Linux are on the roadmap.
+- **Claude Code** with plugin support. Tested with 2.1.332.
+- **Python 3.10 or later**, installed from [python.org](https://www.python.org/downloads/windows/)
+  (recommended, it includes the `py` launcher) or any other distribution.
+  Tested end to end with 3.14; the test suite also runs on 3.10.
+- **An internet connection** while speech is on: synthesis is an online service.
+
+## Install
+
+**1. Add the marketplace and install the plugin**
 
 ```bash
-claude plugin install franco@franco
+claude plugin marketplace add davideferrari/claude_franco
+claude plugin install franco@claude-franco
 ```
 
-**Requirements**
+The same is available inside Claude Code with `/plugin`. To try a local
+checkout without installing it, start Claude Code with
+`claude --plugin-dir <path-to-checkout>`.
 
-- Windows 10/11 (playback uses MCI; macOS/Linux is planned for v2)
-- Python 3.10+ on PATH
-- `pip install edge-tts` — free neural TTS; synthesis is a network call, so it needs internet
+**2. Install the speech library into the Python that Franco will use**
 
-## 🚀 Quick start
+```powershell
+py -3 -m pip install "edge-tts>=7.0,<8"
+```
+
+Franco looks for Python in this order: the `FRANCO_PYTHON` environment
+variable, `py -3`, `python3`, `python`. The Microsoft Store "App execution
+alias" placeholders are detected and skipped. If you use a virtual
+environment or a specific interpreter, point `FRANCO_PYTHON` at its
+`python.exe`.
+
+**3. Turn speech on**
+
+In Claude Code:
 
 ```text
-/franco on          # turn speech on (also starts the daemon)
-/franco voice       # browse and pick a voice
-/franco wakeword    # choose the name Claude answers to
-/franco off         # mute
+/franco:franco on
 ```
 
-Or with the CLI:
+Franco checks the dependency, starts its background service and confirms. If
+something is missing, it tells you the exact command to run. Speech applies to
+the current session straight away and to every new session.
+
+## Usage
+
+| Command | What it does |
+|---|---|
+| `/franco:franco` | Show the current state: speech, wake name, voices, service, Python, `edge-tts` |
+| `/franco:franco on` · `off` | Turn speech on or off |
+| `/franco:franco silence` | Stop the current audio; speech stays on |
+| `/franco:franco stop` | Shut the background service down; it restarts with the next session while speech is on |
+| `/franco:franco voice` | List the curated voices and choose one per language |
+| `/franco:franco wakeword` | Change the name Claude answers to (default: Franco) |
+| `/franco:btw <note>` | Add a note while Claude is working |
+
+You can also just ask in plain language ("mute", "use a male Italian voice",
+"call yourself Alfredo"): the bundled `franco` skill maps the request to the
+right setting.
+
+> Claude Code also has its own built-in `/btw` for quick side questions.
+> Franco's variant is namespaced as `/franco:btw` and is acknowledged aloud.
+
+The same controls are available from a terminal, run from the plugin folder:
 
 ```bash
-python hooks/franco_ctl.py enable
-python hooks/franco_ctl.py status
-python hooks/franco_ctl.py set-wakeword "Alfredo"
-python hooks/franco_ctl.py silence
+bash hooks/run.sh franco_ctl.py status
+bash hooks/run.sh franco_ctl.py set-voice it it-IT-GiuseppeNeural
+bash hooks/run.sh franco_ctl.py preview "Ciao, sono Franco."
 ```
 
-## ⚙️ How it works
+## How it works
 
+```text
+You send a prompt ──▶ UserPromptSubmit hook ──▶ stop current audio (barge-in)
+                                         └──▶ wake name? ──▶ add "note" context
+Claude replies ──▶ <spoken lang="…"> tag ──▶ Stop hook ──▶ local service
+                                                              ├─ edge-tts synthesis
+                                                              └─ Windows playback
+Session starts ──▶ SessionStart hook ──▶ add the <spoken> rule + start the service
 ```
-user speaks/types ──▶ UserPromptSubmit hook ──▶ barge-in (daemon silences)
-                                         └─▶ wake word? ──▶ "btw" aside
-Claude replies ──▶ <spoken> tag ──▶ Stop hook ──▶ warm localhost daemon
-                                                        └─▶ edge-tts + MCI playback
-SessionStart hook ──▶ injects <spoken> rule (if enabled) + ensures daemon is up
+
+1. When speech is on, the **SessionStart** hook adds a short instruction to
+   Claude's context: end conversational replies with a `<spoken>` summary in
+   plain prose, and skip it for data-shaped replies.
+2. The **Stop** hook takes the final reply of the turn, extracts the last
+   `<spoken>` tag and hands it to the local service.
+3. The service synthesises the text with the voice mapped to the declared
+   language and plays it. Playback is serialised and the queue is short, so
+   speech never lags far behind.
+4. The **UserPromptSubmit** hook stops the audio whenever you send a prompt and
+   recognises the wake name pattern.
+
+While speech is off, the hooks return immediately without starting Python.
+
+## Configuration
+
+Settings are plain files in `%USERPROFILE%\.franco\`, managed through the
+commands above:
+
+| File | Purpose |
+|---|---|
+| `enabled` | Present while speech is on |
+| `wakeword` | The wake name |
+| `voice_map.json` | Language → voice, e.g. `{"it": "it-IT-ElsaNeural", "default": "en-US-AvaMultilingualNeural"}` |
+| `python` | The interpreter Franco found; delete it to search again |
+| `daemon.state`, `daemon.log` | Service port, token and log |
+
+| Environment variable | Purpose |
+|---|---|
+| `FRANCO_PYTHON` | Full path of the Python interpreter to use |
+| `FRANCO_HOME` | Alternative settings folder, useful for testing |
+
+## Privacy and data
+
+Please read this before turning speech on.
+
+- **What leaves your machine:** only the text inside each `<spoken>` tag. It
+  is sent to Microsoft's speech service (`speech.platform.bing.com`) to be
+  synthesised. Your prompts, files and the rest of each reply are not sent
+  by Franco.
+- **The summary is written by the model.** Claude is instructed to keep it to
+  plain prose without code, commands or long numbers, but Franco cannot
+  guarantee what a summary contains. Its text clean-up removes formatting
+  only. It is **not** a filter for secrets or personal data. If you work with
+  confidential material, keep speech off for that session.
+- **Unofficial service.** `edge-tts` uses the endpoint behind the Read Aloud
+  feature of Microsoft Edge. It is free and needs no account, but it is not a
+  supported public API and may change or stop working without notice.
+- **What stays local:** settings and a log in `%USERPROFILE%\.franco\`. The
+  log records language, voice, length and outcome of each utterance, never
+  its text. Audio files are temporary and deleted after playback.
+- **Local service:** listens on `127.0.0.1` only. Every command it accepts
+  requires a random token that is regenerated at each start.
+
+Details, and how to report a vulnerability, are in [SECURITY.md](SECURITY.md).
+
+## Known limitations
+
+Franco is an **alpha** release:
+
+- **Windows only** for now.
+- **Settings are per user, not per project.** Speech on or off, voices and
+  the wake name apply to every Claude Code session. With two sessions open,
+  sending a prompt in one also stops audio started by the other.
+- **The wake name is matched in the text you send**, typed or dictated. Franco
+  does not listen to the microphone.
+- **Barge-in happens when a prompt is sent**, not when you start speaking.
+- **Summaries depend on the model** following the instruction. When it skips
+  the tag, the reply is simply not spoken.
+- **Non-interactive runs (`claude -p`) are not spoken:** the session ends, and
+  its audio is stopped, right after the reply.
+
+## Troubleshooting
+
+| Symptom | What to do |
+|---|---|
+| "no working Python 3.10+ found" at session start | Install Python from python.org, or set `FRANCO_PYTHON` to your interpreter's `python.exe`. |
+| "edge-tts is not installed for …" | Run the command shown in the message: it installs into the interpreter Franco is using. |
+| Nothing is spoken | Run `/franco:franco` and check that speech is on and the service is running, then look at `%USERPROFILE%\.franco\daemon.log`. Speech starts with replies that contain a summary. |
+| Wrong Python after installing a new one | Delete `%USERPROFILE%\.franco\python`, or set `FRANCO_PYTHON`. |
+
+## Uninstall
+
+In Claude Code, run `/franco:franco off` and then `/franco:franco stop`.
+Then, from a terminal:
+
+```bash
+claude plugin uninstall franco@claude-franco
+claude plugin marketplace remove claude-franco
 ```
 
-1. A **SessionStart hook** injects the `<spoken>` emission rule (only where
-   speech is enabled) and ensures the daemon is running.
-2. Claude ends conversational replies with `<spoken lang="xx">…</spoken>`
-   (plain prose, 1–2 sentences, no markdown).
-3. The **Stop hook** extracts the tag from the transcript and POSTs it to the
-   daemon, which synthesises it with the voice mapped to the language and
-   plays it (MCI on Windows).
-4. The **UserPromptSubmit hook** implements the conversation feel: barge-in on
-   every new prompt, and wake-name detection turns `Comunque Franco, …` into a
-   mid-task aside (same behaviour as `/btw`).
+Then delete `%USERPROFILE%\.franco\` to remove settings and logs, and
+optionally `py -3 -m pip uninstall edge-tts`.
 
-Speech is **off by default** and opt-in. Data-shaped replies (code, tables,
-dumps) are silent by design — if the model "forgets" the tag, the response is
-simply not spoken: silent degradation, never noisy.
+## Roadmap
 
-## 🔒 Privacy & security
+- macOS and Linux playback (synthesis is already cross-platform)
+- Sentence-by-sentence streaming synthesis
+- Offline voices (Windows SAPI, Piper) as an alternative to the online service
+- Per-project settings
+- `/speak-full` to read a whole reply aloud
 
-- Your **code, tables and file dumps are never sent anywhere**: they never get
-  a `<spoken>` tag. Only the short prose summary leaves your machine.
-- The summary is synthesised by Microsoft's `edge-tts` backend (the
-  undocumented service behind Edge's Read Aloud — free, account-less, but not
-  a supported API; it may change without notice). Fallbacks are documented in
-  [`INTENT.md`](INTENT.md).
-- The daemon listens on `127.0.0.1` only and is token-authenticated.
+## Contributing
 
-## 🗺️ Roadmap
+Issues and pull requests are welcome, including new voices for the language
+map. Please report security issues privately as described in
+[SECURITY.md](SECURITY.md). Run the checks before opening a pull request:
 
-Shipped in **v0.1.0** — the full end-to-end voice loop.
+```bash
+py -3 tests/test_franco.py
+claude plugin validate .
+```
 
-Planned for **v2**:
+## Acknowledgements
 
-- [ ] macOS/Linux playback (synthesis is already cross-platform)
-- [ ] Streaming synthesis, sentence by sentence
-- [ ] Offline fallback (SAPI / Piper)
-- [ ] `/speak-full` — read the entire response aloud
+Speech synthesis by [`edge-tts`](https://github.com/rany2/edge-tts). Franco is
+an independent project, not affiliated with or endorsed by Anthropic or
+Microsoft.
 
-## 🤝 Contributing
+## License
 
-Open to anyone — issues, PRs and new voices for the `lang → voice` map are
-welcome. Keep it friendly.
-
-## 📄 License
-
-Released under the [MIT License](LICENSE) — **free to use, modify and share,
-for everyone**. That means you, your team, your side project and your company.
-
-<div align="center">
-
-*Built for people who talk to their terminal.*
-
-</div>
+[MIT](LICENSE) © 2026 Davide Ferrari
