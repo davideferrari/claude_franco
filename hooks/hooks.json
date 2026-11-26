@@ -1,46 +1,49 @@
 {
-  "SessionStart": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/session_start.py\"",
-          "timeout": 15
-        }
-      ]
-    }
-  ],
-  "UserPromptSubmit": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/prompt_hook.py\"",
-          "timeout": 10
-        }
-      ]
-    }
-  ],
-  "Stop": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/stop_hook.py\"",
-          "timeout": 10
-        }
-      ]
-    }
-  ],
-  "SessionEnd": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/session_end.py\"",
-          "timeout": 5
-        }
-      ]
-    }
-  ]
+  "description": "Franco: spoken summaries, barge-in and wake-name asides.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" --hook session_start.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" --hook prompt_hook.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" --hook stop_hook.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" --hook session_end.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
 }

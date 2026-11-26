@@ -1,0 +1,17 @@
+{
+  "name": "claude-franco",
+  "owner": { "name": "Davide Ferrari" },
+  "metadata": {
+    "description": "Franco: a voice for Claude Code."
+  },
+  "plugins": [
+    {
+      "name": "franco",
+      "source": "./",
+      "description": "Spoken summaries, barge-in and a wake name for Claude Code. Windows, Python 3.10+.",
+      "version": "0.1.0-alpha.1",
+      "license": "MIT",
+      "category": "accessibility"
+    }
+  ]
+}

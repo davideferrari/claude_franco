@@ -10,6 +10,7 @@ import franco_common as fc  # noqa: E402
 
 
 def main():
+    fc.read_stdin_json()
     if fc.is_enabled():
         fc.post_to_daemon("/silence", {}, timeout=1.0)
 

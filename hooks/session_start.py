@@ -22,28 +22,32 @@ SPOKEN_RULE = (
 )
 
 
-def read_stdin_json():
-    try:
-        raw = sys.stdin.read()
-        return json.loads(raw) if raw.strip() else {}
-    except (ValueError, OSError):
-        return {}
+
+def emit(**fields):
+    print(json.dumps(fields))
 
 
 def main():
     if not fc.is_enabled():
         return
-    read_stdin_json()  # consumed for symmetry; source is not used today
-    healthy = fc.ensure_daemon()
-    if not healthy:
-        # Session still proceeds; speech will be skipped this session.
+    fc.read_stdin_json()  # payload not needed today; read it so the pipe is drained
+    if not fc.edge_tts_available():
+        emit(systemMessage=(
+            "Franco: speech is on, but edge-tts is not installed for %s. "
+            "Install it with: %s — then start a new session."
+            % (sys.executable, fc.install_hint())
+        ))
         return
-    print(json.dumps({
-        "hookSpecificOutput": {
-            "hookEventName": "SessionStart",
-            "additionalContext": SPOKEN_RULE,
-        }
-    }))
+    if not fc.ensure_daemon():
+        emit(systemMessage=(
+            "Franco: the speech daemon did not start, so replies will not be "
+            "spoken in this session. Details: %s" % fc.config_path("daemon.log")
+        ))
+        return
+    emit(hookSpecificOutput={
+        "hookEventName": "SessionStart",
+        "additionalContext": SPOKEN_RULE,
+    })
 
 
 if __name__ == "__main__":

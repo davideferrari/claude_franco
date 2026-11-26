@@ -1,5 +1,5 @@
 ---
-description: Register a mid-task aside ("by the way") without derailing the current work
+description: Franco — note something aside without derailing the current work, acknowledged aloud
 argument-hint: <what you want to note>
 ---
 

@@ -6,12 +6,14 @@ Config lives in ~/.franco/ (override with FRANCO_HOME env var, used by tests):
   voice_map.json {"it": "...", "en": "...", "default": "..."}
   daemon.state   {"port": int, "token": str} written by the daemon
   daemon.log     daemon log
+  python         interpreter chosen by hooks/run.sh (cache; safe to delete)
 """
 
 import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
 
 CONFIG_DIR = os.environ.get("FRANCO_HOME") or os.path.join(
@@ -26,9 +28,53 @@ DEFAULT_VOICE_MAP = {
 
 MAX_TEXT_LEN = 4000
 
+# Tested range; keep in sync with requirements.txt (a unit test checks it).
+EDGE_TTS_SPEC = "edge-tts>=7.0,<8"
+
 
 def config_path(name):
     return os.path.join(CONFIG_DIR, name)
+
+
+def read_stdin_json():
+    """Parse the hook payload. Claude Code sends UTF-8 JSON; decode it as such
+    instead of trusting the console code page (cp1252 on most Windows setups)."""
+    try:
+        raw = sys.stdin.buffer.read().decode("utf-8", "replace")
+        data = json.loads(raw) if raw.strip() else {}
+        return data if isinstance(data, dict) else {}
+    except (ValueError, OSError, AttributeError):
+        return {}
+
+
+def log(msg):
+    """Append a line to daemon.log; never raises."""
+    try:
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        with open(config_path("daemon.log"), "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+    except OSError:
+        pass
+
+
+def edge_tts_available():
+    import importlib.util
+
+    return importlib.util.find_spec("edge_tts") is not None
+
+
+def edge_tts_version():
+    try:
+        from importlib.metadata import version
+
+        return version("edge-tts")
+    except Exception:  # noqa: BLE001 — metadata lookups vary across installs
+        return None
+
+
+def install_hint():
+    """Exact command that installs the dependency into the running interpreter."""
+    return '"%s" -m pip install "%s"' % (sys.executable, EDGE_TTS_SPEC)
 
 
 def is_enabled():
@@ -139,41 +185,61 @@ def daemon_healthy(timeout=0.5):
         return False
 
 
+def daemon_health(timeout=0.5):
+    """Return the daemon's /health payload, or None if it is not reachable."""
+    state = read_daemon_state()
+    if not state:
+        return None
+    try:
+        with urllib.request.urlopen(
+            "http://127.0.0.1:%d/health" % state["port"], timeout=timeout
+        ) as resp:
+            data = json.loads(resp.read().decode("utf-8") or "{}")
+            return data if resp.status == 200 and isinstance(data, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def daemon_python():
+    """Interpreter for the daemon: the same environment that runs the hooks,
+    so edge-tts is found where it was installed. On Windows, prefer the
+    windowless pythonw.exe that sits next to python.exe."""
+    exe = sys.executable or "python"
+    if os.name == "nt":
+        windowless = os.path.join(os.path.dirname(exe), "pythonw.exe")
+        if os.path.isfile(windowless):
+            return windowless
+    return exe
+
+
 def ensure_daemon(wait_seconds=3.0):
     """Start the daemon detached if it is not already healthy. Returns True if healthy."""
     if daemon_healthy():
         return True
     import subprocess
+    import time
 
     here = os.path.dirname(os.path.abspath(__file__))
-    daemon_py = os.path.join(here, "franco_daemon.py")
+    cmd = [daemon_python(), os.path.join(here, "franco_daemon.py")]
+    kwargs = dict(stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if os.name == "nt":
-        pythonw = "pythonw"
-        creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
+        kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
             subprocess, "CREATE_NO_WINDOW", 0
         )
-        subprocess.Popen(
-            [pythonw, daemon_py],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=creationflags,
-        )
     else:
-        subprocess.Popen(
-            [sys.executable, daemon_py],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-    import time
+        kwargs["start_new_session"] = True
+    try:
+        subprocess.Popen(cmd, **kwargs)
+    except OSError as exc:
+        log("daemon launch failed (%s): %s" % (cmd[0], exc))
+        return False
 
     deadline = time.monotonic() + wait_seconds
     while time.monotonic() < deadline:
         time.sleep(0.25)
         if daemon_healthy(0.3):
             return True
+    log("daemon did not answer /health within %.1fs (%s)" % (wait_seconds, cmd[0]))
     return False
 
 

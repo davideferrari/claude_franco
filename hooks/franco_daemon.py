@@ -76,12 +76,22 @@ class _Player:
                 self.current = None
             return
         if stopper.event().is_set():  # barged in during synthesis
+            self._log("spoke lang=%s chars=%d: interrupted before playback" % (lang or "-", len(text)))
             _discard(path)
             with self.lock:
                 self.current = None
             return
         try:
-            playback.play(path, stopper.event())
+            completed = playback.play(path, stopper.event())
+            # Metadata only: the spoken text itself is never written to disk.
+            if completed:
+                outcome = "ok"
+            elif stopper.event().is_set():
+                outcome = "interrupted"
+            else:
+                outcome = "FAILED (audio backend %s)" % playback.get_backend()
+            self._log("spoke lang=%s voice=%s chars=%d: %s"
+                      % (lang or "-", fc.voice_for_lang(lang), len(text), outcome))
         except Exception as exc:  # noqa: BLE001
             self._log("playback failed: %s" % exc)
         _discard(path)

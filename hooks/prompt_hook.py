@@ -31,13 +31,6 @@ BTW_CONTEXT = (
 )
 
 
-def read_stdin_json():
-    try:
-        raw = sys.stdin.read()
-        return json.loads(raw) if raw.strip() else {}
-    except (ValueError, OSError):
-        return {}
-
 
 def wake_pattern(wake):
     word = re.escape(wake)
@@ -49,7 +42,7 @@ def wake_pattern(wake):
 
 
 def main():
-    data = read_stdin_json()
+    data = fc.read_stdin_json()
     prompt = str(data.get("prompt", "") or "")
     if not fc.is_enabled():
         return

@@ -3,7 +3,8 @@
 
 Usage:
   python franco_ctl.py enable                 turn speech on (and start the daemon)
-  python franco_ctl.py disable                turn speech off (and silence)
+  python franco_ctl.py disable                turn speech off and silence (the daemon
+                                              stays running; it is idle and harmless)
   python franco_ctl.py status                 show current state
   python franco_ctl.py set-wakeword <name>    change the wake word (default: franco)
   python franco_ctl.py set-voice <lang> <id>  map a language to an edge-tts voice
@@ -50,17 +51,28 @@ def write_voice_map_entry(lang, voice):
         json.dump(vm, f, indent=2)
 
 
+def edge_tts_line():
+    if not fc.edge_tts_available():
+        return "missing (install with: %s)" % fc.install_hint()
+    return "installed %s" % (fc.edge_tts_version() or "")
+
+
 def cmd_status():
+    health = fc.daemon_health()
     state = fc.read_daemon_state()
+    if health and state:
+        daemon = "running on port %s" % state["port"]
+        if health.get("synth") is False:
+            daemon += " (last synthesis failed, see %s)" % fc.config_path("daemon.log")
+    else:
+        daemon = "not running"
     lines = [
         "speech: %s" % ("on" if fc.is_enabled() else "off"),
         "wakeword: %s" % fc.read_wakeword(),
         "voice map: %s" % json.dumps(fc.load_voice_map()),
-        "daemon: %s" % (
-            "running on port %s" % state["port"]
-            if fc.daemon_healthy() and state
-            else "not running"
-        ),
+        "daemon: %s" % daemon,
+        "python: %s" % sys.executable,
+        "edge-tts: %s" % edge_tts_line(),
     ]
     print("\n".join(lines))
 
@@ -74,8 +86,14 @@ def main(argv):
 
     if cmd == "enable":
         open(fc.config_path("enabled"), "w").close()
-        ok = fc.ensure_daemon()
-        print("speech on" + ("" if ok else " (warning: daemon did not start)"))
+        if not fc.edge_tts_available():
+            print("speech on, but edge-tts is missing for this Python. Install it with:\n  %s"
+                  % fc.install_hint())
+            return 1
+        if not fc.ensure_daemon():
+            print("speech on, but the daemon did not start; see %s" % fc.config_path("daemon.log"))
+            return 1
+        print("speech on (daemon running; new sessions speak automatically)")
         return 0
     if cmd == "disable":
         try:
@@ -119,8 +137,13 @@ def main(argv):
         if not fc.is_enabled():
             print("speech is off — run 'franco_ctl.py enable' first")
             return 1
-        fc.ensure_daemon()
-        fc.post_to_daemon("/say", {"text": " ".join(rest), "lang": ""}, timeout=10.0)
+        if not fc.ensure_daemon():
+            print("daemon did not start; see %s" % fc.config_path("daemon.log"))
+            return 1
+        if not fc.post_to_daemon("/say", {"text": " ".join(rest), "lang": ""}, timeout=10.0):
+            print("could not reach the daemon")
+            return 1
+        print("queued for playback")
         return 0
     print("unknown command: %s\n%s" % (cmd, __doc__))
     return 2

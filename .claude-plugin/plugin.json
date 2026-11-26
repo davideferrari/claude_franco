@@ -1,10 +1,25 @@
 {
   "name": "franco",
-  "version": "0.1.0",
-  "description": "Give Claude Code a name and a voice: neural spoken summaries (edge-tts), automatic barge-in, and a wake word for mid-task asides. Italian-first, multilingual.",
-  "author": { "name": "Davide Ferrari" },
+  "version": "0.1.0-alpha.1",
+  "description": "Give Claude Code a voice: short spoken summaries with free neural voices (edge-tts), barge-in on every new prompt, and a wake name for mid-task notes. Italian-first, multilingual. Windows.",
+  "author": {
+    "name": "Davide Ferrari"
+  },
+  "homepage": "https://github.com/davideferrari/claude_franco",
+  "repository": "https://github.com/davideferrari/claude_franco",
   "license": "MIT",
-  "hooks": "./hooks/hooks.json",
-  "commands": "./commands",
-  "skills": "./skills"
+  "keywords": [
+    "tts",
+    "voice",
+    "speech",
+    "accessibility",
+    "edge-tts",
+    "italian",
+    "windows"
+  ],
+  "network": {
+    "hosts": [
+      "speech.platform.bing.com"
+    ]
+  }
 }
