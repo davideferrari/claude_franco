@@ -15,7 +15,7 @@ Nessuno dei due ha un meccanismo di dialogo vero.
 
 ## Differenziatori (v1)
 
-1. **Italiano e multilingua.** Voci curate per italiano (it-IT-ElsaNeural / it-IT-GiuseppeNeural)
+1. **Italiano e multilingua.** Voci curate per italiano (it-IT-ElsaNeural, it-IT-DiegoNeural e altre)
    e mappa lingua→voce estendibile. La lingua non si "indovina": Claude stesso la dichiara nel
    tag `<spoken lang="it">…</spoken>`, perché sa già in che lingua sta scrivendo. Zero librerie
    di detection, zero falsi positivi.

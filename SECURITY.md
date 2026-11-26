@@ -15,13 +15,15 @@ Only the latest release is supported with fixes during the alpha phase.
 |---|---|
 | Text inside each `<spoken>` tag | Sent to Microsoft's speech service (`speech.platform.bing.com`) through `edge-tts` for synthesis |
 | Your prompts, files, the rest of each reply | Not sent anywhere by Franco |
-| Settings (`enabled`, `wakeword`, `voice_map.json`, `python`) | `%USERPROFILE%\.franco\` |
+| Settings and service files (`enabled`, `wakeword`, `voice_map.json`, `python`, `daemon.state`, `daemon.lock`, `last_spoken`, a hash of the last summary) | `%USERPROFILE%\.franco\` |
 | Service log | `%USERPROFILE%\.franco\daemon.log`: start/stop events, errors and, per utterance, language, voice, length and outcome. Never the spoken text |
 | Synthesised audio | A temporary file, deleted after playback |
 
 The summary is written by the model following Franco's instruction (plain
 prose, no code, commands or long numbers). Franco removes formatting before
-synthesis, but it does not detect secrets or personal data. If you work with
+synthesis, and refuses to speak a summary that contains code, a table or
+markup, or is unusually long; tags shown inside code blocks are ignored. It
+does not detect secrets or personal data. If you work with
 confidential material, turn speech off with `/franco:franco off`.
 
 `edge-tts` relies on the endpoint behind Microsoft Edge's Read Aloud feature.

@@ -50,6 +50,34 @@ check("last tag wins", (lang, text) == ("it", "due"))
 lang, text = fc.extract_spoken('<spoken lang="IT-IT">Ciao.</spoken>')
 check("lang lowercased", lang == "it-it")
 
+# Tags shown as examples inside code are not instructions to speak.
+fenced = 'Example:\n```html\n<spoken lang="en">Example only</spoken>\n```\nDone.'
+check("tag inside a code fence is ignored", fc.extract_spoken(fenced) == (None, None))
+tilde = 'Example:\n~~~\n<spoken lang="en">Example only</spoken>\n~~~\n'
+check("tag inside a tilde fence is ignored", fc.extract_spoken(tilde) == (None, None))
+inline = 'Use `<spoken lang="it">x</spoken>` at the end.'
+check("tag inside inline code is ignored", fc.extract_spoken(inline) == (None, None))
+after = fenced + ' <spoken lang="it">Ho mostrato un esempio.</spoken>'
+check("real tag after a code block is found", fc.extract_spoken(after) == ("it", "Ho mostrato un esempio."))
+check("tag without lang uses the default voice",
+      fc.extract_spoken("x <spoken>Fatto.</spoken>") == ("", "Fatto."))
+lang, text = fc.extract_spoken('<spoken lang="it">Esegui `rm -rf build` ora.</spoken>')
+check("code inside a real tag is kept, then refused", fc.unspeakable_reason(text or "") == "code", repr(text))
+check("unclosed tag is not spoken", fc.extract_spoken('<spoken lang="it">mai chiuso') == (None, None))
+
+# Conservative policy: a summary that is not plain prose is not spoken at all.
+check("plain prose is speakable", fc.unspeakable_reason("Ho corretto il bug, i test passano.") is None)
+check("summary with code is refused", fc.unspeakable_reason("Ho aggiunto `rm -rf build`.") == "code")
+check("summary with a table is refused", fc.unspeakable_reason("| a | b |\n|---|---|\n| 1 | 2 |") == "table")
+check("summary with markup is refused", fc.unspeakable_reason('uno <spoken lang="it">due') == "markup")
+check("overlong summary is refused", fc.unspeakable_reason("parola " * 200) == "too long")
+nested = '<spoken lang="it">uno <spoken lang="it">due</spoken>'
+lang, text = fc.extract_spoken(nested)
+check("nested tag is refused", text is None or fc.unspeakable_reason(text) is not None, repr(text))
+
+check("sanitise drops inline code entirely", "segreto" not in fc.sanitise("prima `segreto` dopo"))
+check("sanitise drops table rows", fc.sanitise("| a | b |\n|---|---|\n| 1 | 2 |") == "")
+
 # --- voice mapping ----------------------------------------------------------------
 vm = dict(fc.DEFAULT_VOICE_MAP)
 check("voice it", fc.voice_for_lang("it", vm) == "it-IT-ElsaNeural")
@@ -57,6 +85,58 @@ check("voice it-IT", fc.voice_for_lang("it-IT", vm) == "it-IT-ElsaNeural")
 check("voice en-US", fc.voice_for_lang("en-US", vm) == "en-US-AvaMultilingualNeural")
 check("voice unknown falls to default", fc.voice_for_lang("xx", vm) == vm["default"])
 check("voice empty falls to default", fc.voice_for_lang("", vm) == vm["default"])
+
+# --- voice selection (CLI) -----------------------------------------------------------
+import contextlib  # noqa: E402
+import io  # noqa: E402
+
+import franco_ctl as ctl  # noqa: E402
+
+langs = {lang for lang, _, _, _ in ctl.CURATED_VOICES}
+check("curated list offers a female and a male voice per language",
+      all({g for l, _, g, _ in ctl.CURATED_VOICES if l == lang} == {"female", "male"} for lang in langs))
+check("curated list has no retired voice ids",
+      not {"it-IT-GiuseppeNeural", "de-DE-KatjaNeural"} & {v for _, v, _, _ in ctl.CURATED_VOICES})
+check("curated Italian default is listed", ("it", fc.DEFAULT_VOICE_MAP["it"]) in {(l, v) for l, v, _, _ in ctl.CURATED_VOICES})
+
+
+def run_ctl(*args, catalogue=None):
+    saved_fetch, saved_dir = ctl.fetch_catalogue, fc.CONFIG_DIR
+    ctl.fetch_catalogue = lambda timeout=10: catalogue
+    fc.CONFIG_DIR = ctl_home
+    out = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out):
+            code = ctl.main(list(args))
+    finally:
+        ctl.fetch_catalogue, fc.CONFIG_DIR = saved_fetch, saved_dir
+    return code, out.getvalue()
+
+
+ctl_home = tempfile.mkdtemp(prefix="franco_ctl_")
+catalogue = [{"ShortName": "it-IT-DiegoNeural", "Gender": "Male", "Locale": "it-IT"},
+             {"ShortName": "it-IT-ElsaNeural", "Gender": "Female", "Locale": "it-IT"},
+             {"ShortName": "fr-FR-HenriNeural", "Gender": "Male", "Locale": "fr-FR"}]
+code, out = run_ctl("set-voice", "it", "it-IT-DiegoNeural", catalogue=catalogue)
+saved_dir, fc.CONFIG_DIR = fc.CONFIG_DIR, ctl_home
+check("set-voice accepts a catalogue voice", code == 0 and fc.voice_for_lang("it") == "it-IT-DiegoNeural", out)
+fc.CONFIG_DIR = saved_dir
+code, out = run_ctl("set-voice", "it", "it-IT-GiuseppeNeural", catalogue=catalogue)
+check("set-voice refuses an unknown voice", code == 1 and "voices --all" in out, out)
+code, out = run_ctl("set-voice", "it", "it-IT-IsabellaNeural", catalogue=None)
+check("set-voice offline saves with a warning", code == 0 and "could not check" in out, out)
+code, out = run_ctl("set-voice", "it", "bad voice!", catalogue=catalogue)
+check("set-voice refuses a malformed id", code == 2, out)
+code, out = run_ctl("voices", "--all", "it", catalogue=catalogue)
+check("voices --all lists the catalogue by locale",
+      code == 0 and "it-IT-DiegoNeural" in out and "Male" in out and "fr-FR" not in out, out)
+code, out = run_ctl("voices", "--all", catalogue=None)
+check("voices --all reports an unreachable service", code == 1, out)
+check("preview parses --voice and --lang",
+      ctl.parse_preview(["--voice", "it-IT-DiegoNeural", "--lang", "it", "Ciao", "a", "tutti"])
+      == ("it-IT-DiegoNeural", "it", "Ciao a tutti"))
+check("preview defaults", ctl.parse_preview(["Ciao"]) == (None, "", "Ciao"))
+__import__("shutil").rmtree(ctl_home, ignore_errors=True)
 
 # --- wake word pattern ---------------------------------------------------------------
 ph.CONNECTORS = r"comunque|btw|anyway"  # freeze for tests
@@ -112,6 +192,19 @@ check("stop text prefers last_assistant_message",
                     "transcript_path": "/nonexistent"}) == 'ok <spoken lang="en">Done.</spoken>')
 check("stop text without message or transcript is empty", sh.turn_text({}) == "")
 
+# The same turn is never spoken twice (e.g. Stop firing again for one prompt).
+dedupe_home = tempfile.mkdtemp(prefix="franco_dedupe_")
+saved_dir, fc.CONFIG_DIR = fc.CONFIG_DIR, dedupe_home
+turn = {"session_id": "s1", "prompt_id": "p1"}
+check("first delivery of a turn is spoken", sh.already_spoken(turn, "Fatto.") is False)
+check("repeat of the same turn is skipped", sh.already_spoken(turn, "Fatto.") is True)
+check("next turn with the same words is spoken",
+      sh.already_spoken({"session_id": "s1", "prompt_id": "p2"}, "Fatto.") is False)
+with open(fc.config_path("last_spoken"), encoding="utf-8") as f:
+    check("dedupe stores a hash, not the text", "Fatto" not in f.read())
+fc.CONFIG_DIR = saved_dir
+__import__("shutil").rmtree(dedupe_home, ignore_errors=True)
+
 # --- plugin packaging --------------------------------------------------------------------
 with open(os.path.join(ROOT, "hooks", "hooks.json"), encoding="utf-8") as f:
     hooks_cfg = json.load(f)
@@ -150,22 +243,55 @@ if os.name == "nt":
 else:
     check("daemon uses the hook interpreter", fc.daemon_python() == sys.executable)
 
-real_popen, real_healthy = subprocess.Popen, fc.daemon_healthy
+real_popen, real_health, real_post = subprocess.Popen, fc.daemon_health, fc.post_to_daemon
 
 
 def _no_python(*args, **kwargs):
     raise FileNotFoundError("pythonw not found")
 
 
-subprocess.Popen, fc.daemon_healthy = _no_python, (lambda timeout=0.5: False)
+subprocess.Popen, fc.daemon_health = _no_python, (lambda timeout=0.5: None)
 try:
     started = fc.ensure_daemon(wait_seconds=0.1)
 except OSError as exc:
     started = "raised %r" % exc
-subprocess.Popen, fc.daemon_healthy = real_popen, real_healthy
+subprocess.Popen, fc.daemon_health = real_popen, real_health
 check("ensure_daemon reports a failed launch", started is False, str(started))
 with open(fc.config_path("daemon.log"), encoding="utf-8") as f:
     check("failed launch is logged", "pythonw not found" in f.read())
+
+# After a plugin update, a daemon still running the old code is replaced.
+check("build id is stable", fc.build_id() == fc.build_id() and len(fc.build_id()) == 12)
+sim = {"build": "old-build", "launched": 0, "posts": []}
+
+
+def _sim_health(timeout=0.5):
+    if sim["build"] is None:
+        return None
+    return {"ok": True, "pid": 1, "build": sim["build"]}
+
+
+def _sim_post(path, payload, timeout=3.0):
+    sim["posts"].append(path)
+    if path == "/shutdown":
+        sim["build"] = None
+    return True
+
+
+def _sim_popen(*args, **kwargs):
+    sim["launched"] += 1
+    sim["build"] = fc.build_id()
+
+
+fc.daemon_health, fc.post_to_daemon, subprocess.Popen = _sim_health, _sim_post, _sim_popen
+try:
+    replaced = fc.ensure_daemon(wait_seconds=1.0)
+    current_untouched = fc.ensure_daemon(wait_seconds=1.0)
+finally:
+    fc.daemon_health, fc.post_to_daemon, subprocess.Popen = real_health, real_post, real_popen
+check("outdated daemon is shut down and relaunched",
+      replaced is True and sim["posts"] == ["/shutdown"] and sim["launched"] == 1, str(sim))
+check("current daemon is left running", current_untouched is True and sim["launched"] == 1, str(sim))
 
 
 def run_session_start(edge_ok, daemon_ok):
@@ -206,25 +332,8 @@ check("hook stdin decoded as UTF-8", "perch\\xe9 s\\xec" in probe.stdout.decode(
 # --- launcher (hooks/run.sh) ----------------------------------------------------------------
 
 
-def find_bash():
-    if os.name != "nt":
-        return "/bin/bash" if os.path.exists("/bin/bash") else None
-    explicit = os.environ.get("CLAUDE_CODE_GIT_BASH_PATH")
-    if explicit and os.path.exists(explicit):
-        return explicit
-    git = __import__("shutil").which("git")  # Git Bash, never WSL's bash.exe
-    if not git:
-        return None
-    # git.exe lives in <Git>\cmd, <Git>\bin or <Git>\mingw64\bin: walk up to <Git>.
-    base = os.path.dirname(git)
-    for _ in range(3):
-        for rel in (("bin", "bash.exe"), ("usr", "bin", "bash.exe")):
-            cand = os.path.join(base, *rel)
-            if os.path.exists(cand):
-                return cand
-        base = os.path.dirname(base)
-    return None
-
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from bash_finder import find_bash  # noqa: E402
 
 BASH = find_bash()
 RUN_SH = os.path.join(ROOT, "hooks", "run.sh").replace("\\", "/")

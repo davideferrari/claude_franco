@@ -12,8 +12,10 @@ First public preview. Windows only.
 
 - Spoken summaries: Claude ends conversational replies with a `<spoken>` tag
   that is read aloud with Microsoft neural voices through `edge-tts`.
-- Language-to-voice map with curated voices for Italian, English, Spanish,
-  French, German and Portuguese.
+- Language-to-voice map with curated female and male voices for Italian,
+  English, Spanish, French, German and Portuguese; `voices --all` browses the
+  full catalogue, `preview --voice` plays a sample, and `set-voice` rejects
+  unknown or retired voice ids.
 - Barge-in: sending a prompt stops the current audio.
 - Wake name ("Comunque Franco, …") and `/franco:btw` for mid-task notes.
 - `/franco:franco` control menu and the `franco` skill for natural-language
@@ -25,6 +27,11 @@ First public preview. Windows only.
   Microsoft Store placeholders; `FRANCO_PYTHON` override.
 - Clear messages when Python or `edge-tts` is missing or the service does
   not start.
+- Conservative speech policy: tags inside code are ignored, and summaries
+  containing code, tables or markup are not spoken; each turn is spoken once.
+- Single service per user (lock file), atomic state file, validated HTTP
+  input, network timeouts, and automatic replacement of a service left
+  running by a previous version.
 
 ### Known limitations
 

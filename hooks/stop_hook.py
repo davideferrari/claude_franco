@@ -10,6 +10,7 @@ current turn is considered, so an older summary is never replayed.
 Never blocks or fails loudly: any problem means "no speech this turn", nothing more.
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -81,6 +82,29 @@ def turn_text(data):
     return ""
 
 
+def already_spoken(data, summary):
+    """True if this turn's summary was already sent; otherwise remember it.
+
+    Only a hash is stored (in <config>/last_spoken), never the text."""
+    key = "\x1f".join([
+        str(data.get("session_id") or ""), str(data.get("prompt_id") or ""), summary,
+    ])
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    path = fc.config_path("last_spoken")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            if f.read().strip() == digest:
+                return True
+    except OSError:
+        pass
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(digest + "\n")
+    except OSError:
+        pass
+    return False
+
+
 def main():
     data = fc.read_stdin_json()
     if not fc.is_enabled():
@@ -91,7 +115,14 @@ def main():
     lang, summary = fc.extract_spoken(text)
     if not summary:
         return  # data-shaped reply (no tag): silent by design
-    fc.post_to_daemon("/say", {"text": summary[: fc.MAX_TEXT_LEN], "lang": lang or ""})
+    reason = fc.unspeakable_reason(summary)
+    if reason:
+        # When in doubt, stay silent. Log the reason and length, not the text.
+        fc.log("summary skipped (%s, chars=%d)" % (reason, len(summary)))
+        return
+    if already_spoken(data, summary):
+        return
+    fc.post_to_daemon("/say", {"text": summary, "lang": lang or ""})
 
 
 if __name__ == "__main__":

@@ -38,7 +38,7 @@ Code, tables and diffs are not read aloud.
 | | |
 |---|---|
 | **Spoken summaries** | Claude ends conversational replies with a short plain-prose summary in a `<spoken>` tag, which Franco reads aloud. Replies that are mostly code, tables or file dumps get no summary and stay silent. |
-| **Italian first, multilingual** | Curated Italian voices (`it-IT-ElsaNeural`, `it-IT-GiuseppeNeural`, `it-IT-IsabellaNeural`) plus English, Spanish, French, German and Portuguese. Claude declares the language of each summary (`<spoken lang="it">`), so no language detection is involved. |
+| **Italian first, multilingual** | Curated female and male voices for Italian, English, Spanish, French, German and Portuguese, and 300+ more in the full catalogue. Claude declares the language of each summary (`<spoken lang="it">`), so no language detection is involved. |
 | **Barge-in** | Sending a new prompt stops the current audio immediately. No hotkey to remember. |
 | **Wake name** | Start a message with `Comunque Franco, …` (or `By the way Franco, …`) to add a note: Claude acknowledges it in one spoken line and keeps working. The name is configurable. `/franco:btw <note>` does the same. |
 | **Warm local service** | A small background process on `127.0.0.1`, protected by a per-run token, synthesises and plays the audio so replies are not delayed by Python start-up. |
@@ -99,7 +99,7 @@ the current session straight away and to every new session.
 | `/franco:franco on` · `off` | Turn speech on or off |
 | `/franco:franco silence` | Stop the current audio; speech stays on |
 | `/franco:franco stop` | Shut the background service down; it restarts with the next session while speech is on |
-| `/franco:franco voice` | List the curated voices and choose one per language |
+| `/franco:franco voice` | Choose a voice per language, with a sample to listen to first |
 | `/franco:franco wakeword` | Change the name Claude answers to (default: Franco) |
 | `/franco:btw <note>` | Add a note while Claude is working |
 
@@ -114,9 +114,37 @@ The same controls are available from a terminal, run from the plugin folder:
 
 ```bash
 bash hooks/run.sh franco_ctl.py status
-bash hooks/run.sh franco_ctl.py set-voice it it-IT-GiuseppeNeural
-bash hooks/run.sh franco_ctl.py preview "Ciao, sono Franco."
+bash hooks/run.sh franco_ctl.py set-voice it it-IT-DiegoNeural
+bash hooks/run.sh franco_ctl.py preview --lang it "Ciao, sono Franco."
 ```
+
+## Voices
+
+Each language has its own voice; Claude picks the language of every summary,
+and Franco uses the voice you chose for it. The curated set:
+
+| Language | Female | Male |
+|---|---|---|
+| Italian | `it-IT-ElsaNeural` (default), `it-IT-IsabellaNeural` | `it-IT-DiegoNeural`, `it-IT-GiuseppeMultilingualNeural` |
+| English | `en-US-AvaMultilingualNeural` (default), `en-GB-SoniaNeural` | `en-US-AndrewMultilingualNeural`, `en-GB-RyanNeural` |
+| Spanish | `es-ES-ElviraNeural` | `es-ES-AlvaroNeural` |
+| French | `fr-FR-DeniseNeural` | `fr-FR-HenriNeural` |
+| German | `de-DE-TanjaNeural` | `de-DE-ChristophNeural` |
+| Portuguese (Brazil) | `pt-BR-FranciscaNeural` | `pt-BR-AntonioNeural` |
+
+`/franco:franco voice` walks you through it and plays a sample before you
+commit. Or just ask: "use a male Italian voice". For other accents and
+languages, browse the full catalogue of the speech service:
+
+```bash
+bash hooks/run.sh franco_ctl.py voices --all en-GB
+bash hooks/run.sh franco_ctl.py preview --voice en-GB-ThomasNeural "Hello, I am Franco."
+bash hooks/run.sh franco_ctl.py set-voice en en-GB-ThomasNeural
+```
+
+`set-voice` checks the id against the catalogue, so a typo or a retired voice
+is reported instead of failing silently. Languages without a voice of their
+own use the `default` entry (`set-voice default <voice-id>`).
 
 ## How it works
 
@@ -141,6 +169,8 @@ Session starts ──▶ SessionStart hook ──▶ add the <spoken> rule + sta
    recognises the wake name pattern.
 
 While speech is off, the hooks return immediately without starting Python.
+Only one service runs per user; after a plugin update, a service still running
+the previous version is replaced automatically.
 
 ## Configuration
 
@@ -153,7 +183,8 @@ commands above:
 | `wakeword` | The wake name |
 | `voice_map.json` | Language → voice, e.g. `{"it": "it-IT-ElsaNeural", "default": "en-US-AvaMultilingualNeural"}` |
 | `python` | The interpreter Franco found; delete it to search again |
-| `daemon.state`, `daemon.log` | Service port, token and log |
+| `daemon.state`, `daemon.lock`, `daemon.log` | Service port and token, single-instance lock, log |
+| `last_spoken` | Hash of the last summary, so a turn is never spoken twice |
 
 | Environment variable | Purpose |
 |---|---|
@@ -171,7 +202,9 @@ Please read this before turning speech on.
 - **The summary is written by the model.** Claude is instructed to keep it to
   plain prose without code, commands or long numbers, but Franco cannot
   guarantee what a summary contains. Its text clean-up removes formatting
-  only. It is **not** a filter for secrets or personal data. If you work with
+  only. It is **not** a filter for secrets or personal data. As a safeguard,
+  a summary that contains code, a table or markup, or is unusually long, is
+  not spoken at all, and tags shown inside code blocks are ignored. If you work with
   confidential material, keep speech off for that session.
 - **Unofficial service.** `edge-tts` uses the endpoint behind the Read Aloud
   feature of Microsoft Edge. It is free and needs no account, but it is not a
@@ -237,7 +270,7 @@ map. Please report security issues privately as described in
 [SECURITY.md](SECURITY.md). Run the checks before opening a pull request:
 
 ```bash
-py -3 tests/test_franco.py
+py -3 tests/run_all.py
 claude plugin validate .
 ```
 

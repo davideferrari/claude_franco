@@ -39,7 +39,7 @@ pronuncia. Codice, tabelle e diff non vengono letti.
 | | |
 |---|---|
 | **Riassunti parlati** | Claude chiude le risposte conversazionali con un breve riassunto in prosa dentro un tag `<spoken>`, che Franco legge ad alta voce. Le risposte composte soprattutto da codice, tabelle o contenuti di file non ricevono il riassunto e restano silenziose. |
-| **Italiano prima di tutto, multilingua** | Voci italiane selezionate (`it-IT-ElsaNeural`, `it-IT-GiuseppeNeural`, `it-IT-IsabellaNeural`), più inglese, spagnolo, francese, tedesco e portoghese. È Claude a dichiarare la lingua di ogni riassunto (`<spoken lang="it">`): nessun rilevamento automatico. |
+| **Italiano prima di tutto, multilingua** | Voci femminili e maschili selezionate per italiano, inglese, spagnolo, francese, tedesco e portoghese, e oltre 300 nel catalogo completo. È Claude a dichiarare la lingua di ogni riassunto (`<spoken lang="it">`): nessun rilevamento automatico. |
 | **Interruzione immediata** | Inviare un nuovo prompt ferma subito l'audio in corso. Nessuna scorciatoia da ricordare. |
 | **Nome di richiamo** | Inizia un messaggio con `Comunque Franco, …` per aggiungere una nota: Claude la conferma con una frase parlata e prosegue il lavoro. Il nome è configurabile. `/franco:btw <nota>` fa lo stesso. |
 | **Servizio locale sempre pronto** | Un piccolo processo in background su `127.0.0.1`, protetto da un token rigenerato a ogni avvio, sintetizza e riproduce l'audio senza i ritardi di avvio di Python. |
@@ -101,7 +101,7 @@ subito nella sessione corrente e in tutte le sessioni successive.
 | `/franco:franco on` · `off` | Attiva o disattiva la voce |
 | `/franco:franco silence` | Ferma l'audio in corso; la voce resta attiva |
 | `/franco:franco stop` | Arresta il servizio in background; riparte con la sessione successiva se la voce è attiva |
-| `/franco:franco voice` | Elenca le voci disponibili e ne sceglie una per lingua |
+| `/franco:franco voice` | Sceglie una voce per lingua, con un ascolto di prova prima di confermare |
 | `/franco:franco wakeword` | Cambia il nome a cui risponde Claude (predefinito: Franco) |
 | `/franco:btw <nota>` | Aggiunge una nota mentre Claude lavora |
 
@@ -116,9 +116,38 @@ Gli stessi controlli sono disponibili da terminale, dalla cartella del plugin:
 
 ```bash
 bash hooks/run.sh franco_ctl.py status
-bash hooks/run.sh franco_ctl.py set-voice it it-IT-GiuseppeNeural
-bash hooks/run.sh franco_ctl.py preview "Ciao, sono Franco."
+bash hooks/run.sh franco_ctl.py set-voice it it-IT-DiegoNeural
+bash hooks/run.sh franco_ctl.py preview --lang it "Ciao, sono Franco."
 ```
+
+## Voci
+
+Ogni lingua ha la sua voce: Claude indica la lingua di ogni riassunto e
+Franco usa la voce che hai scelto per quella lingua. Le voci selezionate:
+
+| Lingua | Femminile | Maschile |
+|---|---|---|
+| Italiano | `it-IT-ElsaNeural` (predefinita), `it-IT-IsabellaNeural` | `it-IT-DiegoNeural`, `it-IT-GiuseppeMultilingualNeural` |
+| Inglese | `en-US-AvaMultilingualNeural` (predefinita), `en-GB-SoniaNeural` | `en-US-AndrewMultilingualNeural`, `en-GB-RyanNeural` |
+| Spagnolo | `es-ES-ElviraNeural` | `es-ES-AlvaroNeural` |
+| Francese | `fr-FR-DeniseNeural` | `fr-FR-HenriNeural` |
+| Tedesco | `de-DE-TanjaNeural` | `de-DE-ChristophNeural` |
+| Portoghese (Brasile) | `pt-BR-FranciscaNeural` | `pt-BR-AntonioNeural` |
+
+`/franco:franco voice` ti guida nella scelta e ti fa ascoltare un esempio
+prima di confermare. Oppure chiedi semplicemente: "usa una voce maschile
+italiana". Per altri accenti e altre lingue puoi sfogliare il catalogo
+completo del servizio vocale:
+
+```bash
+bash hooks/run.sh franco_ctl.py voices --all en-GB
+bash hooks/run.sh franco_ctl.py preview --voice en-GB-ThomasNeural "Hello, I am Franco."
+bash hooks/run.sh franco_ctl.py set-voice en en-GB-ThomasNeural
+```
+
+`set-voice` verifica l'identificativo sul catalogo: un errore di battitura o
+una voce ritirata vengono segnalati invece di fallire in silenzio. Le lingue
+senza una voce propria usano la voce `default` (`set-voice default <voice-id>`).
 
 ## Come funziona
 
@@ -144,6 +173,9 @@ Avvio sessione ──▶ hook SessionStart ──▶ regola <spoken> + avvio del
    riconosce il nome di richiamo.
 
 Con la voce disattivata, gli hook terminano subito senza avviare Python.
+Per ogni utente gira un solo servizio; dopo un aggiornamento del plugin, un
+servizio ancora attivo con la versione precedente viene sostituito
+automaticamente.
 
 ## Configurazione
 
@@ -156,7 +188,8 @@ comandi descritti sopra:
 | `wakeword` | Il nome di richiamo |
 | `voice_map.json` | Lingua → voce, ad esempio `{"it": "it-IT-ElsaNeural", "default": "en-US-AvaMultilingualNeural"}` |
 | `python` | L'interprete trovato da Franco; eliminalo per ripetere la ricerca |
-| `daemon.state`, `daemon.log` | Porta, token e log del servizio |
+| `daemon.state`, `daemon.lock`, `daemon.log` | Porta e token del servizio, lock di istanza singola, log |
+| `last_spoken` | Hash dell'ultimo riassunto, perché un turno non venga mai letto due volte |
 
 | Variabile d'ambiente | Scopo |
 |---|---|
@@ -174,7 +207,10 @@ Leggi questa sezione prima di attivare la voce.
 - **Il riassunto lo scrive il modello.** Claude è istruito a usare prosa
   semplice senza codice, comandi o numeri lunghi, ma Franco non può garantire
   cosa contenga un riassunto. La pulizia del testo rimuove solo la
-  formattazione: **non** è un filtro per segreti o dati personali. Se lavori
+  formattazione: **non** è un filtro per segreti o dati personali. Come
+  ulteriore cautela, un riassunto che contiene codice, una tabella o markup,
+  o che è insolitamente lungo, non viene letto affatto, e i tag mostrati
+  dentro blocchi di codice vengono ignorati. Se lavori
   con materiale riservato, tieni la voce disattivata in quella sessione.
 - **Servizio non ufficiale.** `edge-tts` usa l'endpoint della funzione
   "Leggi ad alta voce" di Microsoft Edge. È gratuito e non richiede account,
@@ -244,7 +280,7 @@ delle lingue. Segnala i problemi di sicurezza in privato, come descritto in
 controlli:
 
 ```bash
-py -3 tests/test_franco.py
+py -3 tests/run_all.py
 claude plugin validate .
 ```
 

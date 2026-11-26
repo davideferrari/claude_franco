@@ -1,27 +1,26 @@
 """Franco daemon: warm edge-tts synthesis + serialized playback on localhost.
 
-Endpoints (all require the X-Franco-Token header, except /health):
-  GET  /say?...   not used — say is POST-only
-  POST /say       {"text": str, "lang": str}  -> queued for synthesis+playback
+Endpoints (all POST endpoints require the X-Franco-Token header):
+  POST /say       {"text": str, "lang": str, "voice"?: str} -> queued for synthesis + playback
   POST /silence   stop current playback and clear the queue
   POST /shutdown  silence, then exit (used by `franco_ctl.py stop`)
-  GET  /health    {"ok": true, "synth": bool, "queue": int}
+  GET  /health    {"ok": true, "pid": int, "synth": bool, "playback": bool, "queue": int}
 
-State is written to ~/.franco/daemon.state: {"port": ..., "token": ...}.
-Runs under pythonw.exe on Windows (no console). Playback is serialized by a
-single worker thread; barge-in (POST /silence) stops audio and drops the queue.
+State is written atomically to ~/.franco/daemon.state: {"port", "token", "pid"}.
+A lock on ~/.franco/daemon.lock keeps a single daemon per user: a second one
+started concurrently exits at once. Runs under pythonw.exe on Windows (no
+console). Playback is serialized by one worker thread; barge-in (POST /silence)
+stops the audio and drops the queue.
 """
 
+import collections
 import json
 import os
-import queue
+import re
 import secrets
-import socket
 import sys
 import tempfile
 import threading
-import urllib.error
-import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -29,123 +28,15 @@ import franco_common as fc  # noqa: E402
 import playback  # noqa: E402
 
 MAX_QUEUE = 3
+BUILD = fc.build_id()  # fixed at start: the code this process is actually running
+MAX_BODY = fc.MAX_TEXT_LEN * 8
+LANG_RE = re.compile(r"[A-Za-z0-9-]{0,20}")
+VOICE_RE = re.compile(r"[A-Za-z]{2,3}-[A-Za-z0-9]{2,8}-[A-Za-z0-9]{1,48}")
 
-
-class _Stopper:
-    """Thread-safe handle to interrupt the currently playing utterance."""
-
-    def __init__(self):
-        self._event = threading.Event()
-
-    def event(self):
-        return self._event
-
-    def stop(self):
-        self._event.set()
-
-
-class _Player:
-    def __init__(self):
-        self.queue = queue.Queue()
-        self.current = None  # _Stopper for the utterance being played
-        self.lock = threading.Lock()
-        self.synth_ok = True
-        self.synth_error = ""
-        self.worker = threading.Thread(target=self._loop, daemon=True)
-        self.worker.start()
-
-    # -- worker ------------------------------------------------------------
-    def _loop(self):
-        while True:
-            item = self.queue.get()
-            if item is None:
-                continue
-            text, lang = item
-            self._speak(text, lang)
-
-    def _speak(self, text, lang):
-        stopper = _Stopper()
-        with self.lock:
-            self.current = stopper
-        try:
-            path = self._synthesise(text, lang)
-        except Exception as exc:  # noqa: BLE001 — never crash the daemon
-            self.synth_ok = False
-            self.synth_error = str(exc)
-            self._log("synth failed: %s" % exc)
-            with self.lock:
-                self.current = None
-            return
-        if stopper.event().is_set():  # barged in during synthesis
-            self._log("spoke lang=%s chars=%d: interrupted before playback" % (lang or "-", len(text)))
-            _discard(path)
-            with self.lock:
-                self.current = None
-            return
-        try:
-            completed = playback.play(path, stopper.event())
-            # Metadata only: the spoken text itself is never written to disk.
-            if completed:
-                outcome = "ok"
-            elif stopper.event().is_set():
-                outcome = "interrupted"
-            else:
-                outcome = "FAILED (audio backend %s)" % playback.get_backend()
-            self._log("spoke lang=%s voice=%s chars=%d: %s"
-                      % (lang or "-", fc.voice_for_lang(lang), len(text), outcome))
-        except Exception as exc:  # noqa: BLE001
-            self._log("playback failed: %s" % exc)
-        _discard(path)
-        with self.lock:
-            self.current = None
-
-    def _synthesise(self, text, lang):
-        import edge_tts
-
-        voice = fc.voice_for_lang(lang)
-        fd, path = tempfile.mkstemp(prefix="franco_", suffix=".mp3")
-        os.close(fd)
-        import asyncio
-
-        loop = asyncio.new_event_loop()
-        try:
-            loop.run_until_complete(
-                edge_tts.Communicate(text, voice, rate="+0%").save(path)
-            )
-        finally:
-            loop.close()
-        return path
-
-    # -- public ------------------------------------------------------------
-    def say(self, text, lang):
-        # Drop the oldest if the queue is full (speech never lags far behind).
-        try:
-            self.queue.put_nowait((text, lang))
-        except queue.Full:
-            try:
-                self.queue.get_nowait()
-            except queue.Empty:
-                pass
-            self.queue.put((text, lang))
-
-    def silence(self):
-        with self.lock:
-            current = self.current
-        if current:
-            current.stop()
-        while True:
-            try:
-                self.queue.get_nowait()
-            except queue.Empty:
-                break
-
-    @staticmethod
-    def _log(msg):
-        try:
-            with open(fc.config_path("daemon.log"), "a", encoding="utf-8") as f:
-                f.write(msg + "\n")
-        except OSError:
-            pass
+# Network limits for one synthesis, in seconds.
+CONNECT_TIMEOUT = 10
+RECEIVE_TIMEOUT = 30
+SYNTH_TIMEOUT = 45
 
 
 def _discard(path):
@@ -155,18 +46,157 @@ def _discard(path):
         pass
 
 
+def _describe(exc):
+    """Short, single-line error description for the log."""
+    msg = " ".join(str(exc).split())[:200]
+    return "%s: %s" % (type(exc).__name__, msg) if msg else type(exc).__name__
+
+
+def synthesise_edge_tts(text, voice):
+    """Synthesise text to a temporary mp3 and return its path.
+
+    The file is removed again if anything goes wrong, including a timeout.
+    """
+    import asyncio
+
+    import edge_tts
+
+    fd_, path = tempfile.mkstemp(prefix="franco_", suffix=".mp3")
+    os.close(fd_)
+    try:
+        communicate = edge_tts.Communicate(
+            text, voice, connect_timeout=CONNECT_TIMEOUT, receive_timeout=RECEIVE_TIMEOUT
+        )
+        asyncio.run(asyncio.wait_for(communicate.save(path), SYNTH_TIMEOUT))
+        if os.path.getsize(path) == 0:
+            raise RuntimeError("the speech service returned no audio")
+    except BaseException:
+        _discard(path)
+        raise
+    return path
+
+
+class Player:
+    """Bounded queue + single worker. All queue and "current utterance" state is
+    guarded by one condition, so silence() cannot miss an item that is being
+    handed from the queue to the worker."""
+
+    def __init__(self, synthesise=None, play=None, max_queue=MAX_QUEUE):
+        self._synthesise = synthesise or synthesise_edge_tts
+        self._play = play or playback.play
+        self.max_queue = max_queue
+        self._cond = threading.Condition()
+        self._items = collections.deque()
+        self._current = None  # threading.Event that stops the current utterance
+        self._closed = False
+        self.synth_ok = True
+        self.playback_ok = True
+        self._worker = threading.Thread(target=self._loop, daemon=True)
+        self._worker.start()
+
+    # -- public ------------------------------------------------------------
+    def say(self, text, lang, voice=None):
+        """Queue an utterance; drop the oldest when full (speech never lags far
+        behind). voice overrides the language map. Returns the queue length."""
+        with self._cond:
+            while len(self._items) >= self.max_queue:
+                self._items.popleft()
+            self._items.append((text, lang, voice))
+            self._cond.notify()
+            return len(self._items)
+
+    def silence(self):
+        with self._cond:
+            self._items.clear()
+            if self._current is not None:
+                self._current.set()
+
+    def health(self):
+        with self._cond:
+            queued = len(self._items)
+        return {
+            "ok": True,
+            "pid": os.getpid(),
+            "build": BUILD,
+            "synth": self.synth_ok,
+            "playback": self.playback_ok,
+            "queue": queued,
+        }
+
+    def close(self, timeout=2.0):
+        with self._cond:
+            self._closed = True
+            self._items.clear()
+            if self._current is not None:
+                self._current.set()
+            self._cond.notify_all()
+        self._worker.join(timeout)
+
+    # -- worker ------------------------------------------------------------
+    def _loop(self):
+        while True:
+            with self._cond:
+                while not self._items and not self._closed:
+                    self._cond.wait()
+                if self._closed:
+                    return
+                text, lang, voice = self._items.popleft()
+                stop = threading.Event()
+                self._current = stop
+            try:
+                self._speak(text, lang, voice, stop)
+            except Exception as exc:  # noqa: BLE001 — never let the worker die
+                fc.log("worker error: %s" % _describe(exc))
+            finally:
+                with self._cond:
+                    self._current = None
+
+    def _speak(self, text, lang, voice, stop):
+        voice = voice or fc.voice_for_lang(lang)
+        # Metadata only in the log: the spoken text itself is never written to disk.
+        meta = "lang=%s voice=%s chars=%d" % (lang or "-", voice, len(text))
+        try:
+            path = self._synthesise(text, voice)
+        except Exception as exc:  # noqa: BLE001
+            self.synth_ok = False
+            fc.log("synthesis failed %s: %s" % (meta, _describe(exc)))
+            return
+        self.synth_ok = True
+        try:
+            if stop.is_set():
+                fc.log("spoke %s: interrupted before playback" % meta)
+                return
+            try:
+                completed = self._play(path, stop)
+                error = ""
+            except Exception as exc:  # noqa: BLE001
+                completed, error = False, _describe(exc)
+            if completed:
+                self.playback_ok = True
+                outcome = "ok"
+            elif stop.is_set():
+                outcome = "interrupted"
+            else:
+                self.playback_ok = False
+                outcome = "FAILED (audio backend %s%s)" % (
+                    playback.get_backend(), ": " + error if error else ""
+                )
+            fc.log("spoke %s: %s" % (meta, outcome))
+        finally:
+            _discard(path)
+
+
 class _Handler(BaseHTTPRequestHandler):
-    player = None  # injected in main()
-    token = ""
+    server_version = "Franco"
 
     def log_message(self, fmt, *args):  # quiet: no console under pythonw
         pass
 
     # -- helpers -----------------------------------------------------------
     def _authorised(self):
-        if not self.token:
-            return True
-        return self.headers.get("X-Franco-Token", "") == self.token
+        expected = self.server.token
+        given = self.headers.get("X-Franco-Token", "")
+        return bool(expected) and secrets.compare_digest(given, expected)
 
     def _send(self, code, obj):
         body = json.dumps(obj).encode("utf-8")
@@ -176,88 +206,167 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _read_body(self):
+        """Read the whole request body before any reply: closing a socket with
+        unread data makes Windows reset the connection, and the client would
+        see an abort instead of the error status. Returns bytes, or None after
+        sending an error."""
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self.close_connection = True
+            self._send(400, {"error": "bad content-length"})
+            return None
+        if length < 0:
+            self.close_connection = True
+            self._send(400, {"error": "bad content-length"})
+            return None
+        if length > MAX_BODY:
+            remaining = min(length, 1 << 20)  # drain a bounded amount, then give up
+            while remaining > 0:
+                chunk = self.rfile.read(min(remaining, 65536))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+            self.close_connection = True
+            self._send(413, {"error": "body too large"})
+            return None
+        return self.rfile.read(length) if length else b""
+
+    def _parse_payload(self, raw):
+        """Return the JSON object in the body, or None after sending an error."""
+        try:
+            payload = json.loads(raw.decode("utf-8")) if raw.strip() else {}
+        except (ValueError, UnicodeDecodeError):
+            self._send(400, {"error": "bad json"})
+            return None
+        if not isinstance(payload, dict):
+            self._send(400, {"error": "expected a JSON object"})
+            return None
+        return payload
+
     # -- routes ------------------------------------------------------------
     def do_GET(self):  # noqa: N802
         if self.path == "/health":
-            self._send(200, {
-                "ok": True,
-                "synth": self.player.synth_ok,
-                "queue": self.player.queue.qsize(),
-            })
+            self._send(200, self.server.player.health())
         elif self.path in ("/say", "/silence", "/shutdown"):
             self._send(405, {"error": "POST required"})
         else:
             self._send(404, {"error": "not found"})
 
     def do_POST(self):  # noqa: N802
+        raw = self._read_body()
+        if raw is None:
+            return
         if not self._authorised():
             self._send(403, {"error": "bad token"})
             return
-        length = min(int(self.headers.get("Content-Length", 0) or 0), fc.MAX_TEXT_LEN * 8)
-        try:
-            payload = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
-        except (ValueError, UnicodeDecodeError):
-            self._send(400, {"error": "bad json"})
+        if self.path not in ("/say", "/silence", "/shutdown"):
+            self._send(404, {"error": "not found"})
             return
+        payload = self._parse_payload(raw)
+        if payload is None:
+            return
+        player = self.server.player
 
         if self.path == "/say":
-            text = fc.sanitise(str(payload.get("text", "")))[: fc.MAX_TEXT_LEN]
-            lang = str(payload.get("lang", "") or "")
+            text, lang = payload.get("text", ""), payload.get("lang", "") or ""
+            voice = payload.get("voice") or None
+            if not isinstance(text, str) or not isinstance(lang, str) or not LANG_RE.fullmatch(lang):
+                self._send(400, {"error": "text and lang must be strings; lang a language tag"})
+                return
+            if voice is not None and not (isinstance(voice, str) and VOICE_RE.fullmatch(voice)):
+                self._send(400, {"error": "voice must be a voice id such as it-IT-ElsaNeural"})
+                return
+            text = fc.sanitise(text)[: fc.MAX_TEXT_LEN]
             if not text:
                 self._send(200, {"ok": True, "skipped": "empty"})
-            else:
-                self.player.say(text, lang)
-                self._send(200, {"ok": True, "queued": self.player.queue.qsize()})
+                return
+            self._send(200, {"ok": True, "queued": player.say(text, lang, voice)})
         elif self.path == "/silence":
-            self.player.silence()
+            player.silence()
             self._send(200, {"ok": True})
-        elif self.path == "/shutdown":
-            self.player.silence()
+        else:  # /shutdown
+            player.silence()
             self._send(200, {"ok": True})
             # shutdown() blocks until serve_forever() returns: call it off-thread.
             threading.Thread(target=self.server.shutdown, daemon=True).start()
+
+
+def make_server(player, token, port=0):
+    server = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
+    server.daemon_threads = True
+    server.player = player
+    server.token = token
+    return server
+
+
+def acquire_single_instance(path):
+    """Take an exclusive, non-blocking lock held for the life of the process.
+    Returns the open lock file, or None if another daemon holds it."""
+    try:
+        handle = open(path, "a+b")
+    except OSError:
+        return None
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
         else:
-            self._send(404, {"error": "not found"})
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None
+    return handle
 
 
 def main():
-    home = fc.CONFIG_DIR
-    os.makedirs(home, exist_ok=True)
+    os.makedirs(fc.CONFIG_DIR, exist_ok=True)
+    lock = acquire_single_instance(fc.config_path("daemon.lock"))
+    if lock is None:
+        fc.log("another daemon is already running; pid %d exits" % os.getpid())
+        return
 
     token = secrets.token_hex(16)
-    _Handler.token = token
-    _Handler.player = _Player()
-
-    server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    player = Player()
+    server = make_server(player, token)
     port = server.server_address[1]
+    fc.write_state({"port": port, "token": token, "pid": os.getpid()})
+    fc.log("daemon started on port %d (pid %d)" % (port, os.getpid()))
 
-    with open(fc.config_path("daemon.state"), "w", encoding="utf-8") as f:
-        json.dump({"port": port, "token": token}, f)
+    def remove_state():
+        state = fc.read_daemon_state()
+        if state and state.get("pid") == os.getpid():
+            try:
+                os.unlink(fc.config_path("daemon.state"))
+            except OSError:
+                pass
 
-    _Player._log("daemon started on port %d (pid %d)" % (port, os.getpid()))
-
-    def shutdown(signum, frame):  # noqa: ARG001
-        _Handler.player.silence()
-        try:
-            os.unlink(fc.config_path("daemon.state"))
-        except OSError:
-            pass
+    def on_signal(signum, frame):  # noqa: ARG001
+        player.silence()
+        remove_state()
         sys.exit(0)
 
     try:
         import signal
-        signal.signal(signal.SIGTERM, shutdown)
-        signal.signal(signal.SIGINT, shutdown)
+
+        signal.signal(signal.SIGTERM, on_signal)
+        signal.signal(signal.SIGINT, on_signal)
     except (ImportError, ValueError):
         pass
 
-    server.serve_forever()
-    server.server_close()
     try:
-        os.unlink(fc.config_path("daemon.state"))
-    except OSError:
-        pass
-    _Player._log("daemon stopped (pid %d)" % os.getpid())
+        server.serve_forever()
+    finally:
+        server.server_close()
+        player.close()
+        remove_state()
+        fc.log("daemon stopped (pid %d)" % os.getpid())
+        lock.close()
 
 
 if __name__ == "__main__":

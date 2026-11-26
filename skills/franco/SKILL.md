@@ -17,8 +17,9 @@ Map what the user wants to a command:
 | "make Claude talk", "turn on speech/TTS" | `enable` |
 | "mute", "turn speech off" | `disable` |
 | "stop talking right now", "be quiet", "silence" | `silence` (speech stays on) |
-| "switch to <voice>", "use a male/British/Italian voice" | `voices [lang]` to list, then `set-voice <lang> <id>` |
-| "what voices are there" | `voices` |
+| "switch to <voice>", "use a male/female/British/Italian voice" | `voices [lang]` to list (with gender), optionally `preview --voice <id> "<sample>"`, then `set-voice <lang> <id>` |
+| "what voices are there", "more voices", "a Mexican Spanish voice" | `voices`, or `voices --all <locale>` for the full catalogue |
+| "let me hear <voice>" | `preview --voice <id> "<short sentence in its language>"` |
 | "call yourself <name>", "change the wake name to <name>" | `set-wakeword <name>` |
 | "how is speech configured", "franco status" | `status` |
 | Addresses you by the wake name mid-task ("Comunque Franco, nota questo") | No command: treat it as a note — acknowledge in one line with a `<spoken>` tag and keep working |

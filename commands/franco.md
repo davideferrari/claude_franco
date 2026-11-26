@@ -31,8 +31,14 @@ Behaviour:
 - `silence`: run `silence` to stop the current audio.
 - `stop`: run `stop` to shut the background service down (for example before
   uninstalling). If speech is still on, it restarts with the next session.
-- `voice`: run `voices`, show the list numbered, ask which one to use, then run
-  `set-voice <lang> <voice-id>` (the lang is the voice id's prefix, e.g. `it`).
+- `voice`: run `voices` and show the curated list numbered, with gender
+  (female/male) and notes, grouped by language. Ask which one to use, and
+  offer to play a sample first: `preview --voice <voice-id> "<one short
+  sentence in that language>"`. When the user confirms, run
+  `set-voice <lang> <voice-id>` (lang is the voice id's prefix, e.g. `it`).
+  If they want more choice, or a language or accent that is not listed, run
+  `voices --all <locale>` (e.g. `it`, `en-GB`, `es-MX`) to browse the full
+  catalogue. If `set-voice` reports an unknown voice, show its message.
 - `wakeword`: ask which name they want to use, run `set-wakeword <name>`, and
   confirm with an example: "Comunque <name>, …" adds a note while I keep working.
 
